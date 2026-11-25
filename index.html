@@ -1013,15 +1013,99 @@
       });
     }
 
-    // Hitung kuota orang per minggu secara otomatis (bagi rata N orang ke W minggu, minimal 2 orang/minggu jika penghuni >= 2)
+    // Hitung kuota orang per minggu secara otomatis:
+    // - Jika penghuni sisa (misal 9 orang di 4 minggu), sisa 1 orang otomatis DITITIP ke minggu awal (3, 2, 2, 2) -> semua tepat 1x, 0 double!
+    // - Jika 8 orang di 5 minggu (tiap minggu minimal 2 orang = 10 slot), maka 2 slot ekstra di Minggu 5 diambil dengan proteksi Anti-Double Lintas Bulan.
     function distributeSlots_(totalPeople, totalWeeks) {
       if (totalWeeks <= 0) return [];
       if (totalPeople <= 1) return Array(totalWeeks).fill(totalPeople);
-      const base = Math.floor(totalPeople / totalWeeks);
-      const rem = totalPeople % totalWeeks;
-      return Array.from({ length: totalWeeks }, (_, i) => {
-        const raw = base + (i < rem ? 1 : 0);
-        return Math.max(raw, Math.min(2, totalPeople));
+      if (totalPeople >= totalWeeks * 2) {
+        // Semua minggu dapat >= 2 orang, sisa orang dititip ke minggu-minggu pertama (0 orang double!)
+        const base = Math.floor(totalPeople / totalWeeks);
+        const rem = totalPeople % totalWeeks;
+        return Array.from({ length: totalWeeks }, (_, i) => base + (i < rem ? 1 : 0));
+      }
+      // Jika totalPeople < totalWeeks * 2 (contoh: 8 orang di 5 minggu), tiap minggu minimal 2 orang agar tidak piket sendirian
+      return Array(totalWeeks).fill(Math.min(2, totalPeople));
+    }
+
+    function getPrevMonthYm_(ym) {
+      const m = String(ym || '').match(/^(\d{4})-(\d{2})$/);
+      if (!m) return '';
+      let y = Number(m[1]), mo = Number(m[2]) - 1;
+      if (mo < 1) { mo = 12; y -= 1; }
+      return `${y}-${String(mo).padStart(2, '0')}`;
+    }
+
+    function getDoubledNamesInMonth_(ym) {
+      try {
+        const raw = localStorage.getItem('FORTMESS_PIKET_' + ym);
+        if (!raw) return [];
+        const sched = JSON.parse(raw);
+        const counts = {};
+        sched.forEach(s => {
+          String(s.assignees || '').split(',').map(x => x.trim()).filter(Boolean).forEach(n => {
+            counts[n] = (counts[n] || 0) + 1;
+          });
+        });
+        return Object.keys(counts).filter(n => counts[n] > 1);
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function allocateFairMonthlyNames_(ym, monthWeeks, activeNames, shouldShuffle) {
+      const slots = distributeSlots_(activeNames.length, monthWeeks.length);
+      if (activeNames.length === 0) return monthWeeks.map(w => ({ ...w, week: w.weekLabel, day: 'Minggu', assignees: '-', status: 'Terjadwal', note: '' }));
+
+      const shuffle = (arr) => {
+        const copy = [...arr];
+        if (!shouldShuffle) return copy;
+        for (let i = copy.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+      };
+
+      // Cek siapa yang kena double di bulan sebelumnya agar TIDAK kena double lagi di bulan ini
+      const prevYm = getPrevMonthYm_(ym);
+      const prevDoubled = getDoubledNamesInMonth_(prevYm).map(n => n.toLowerCase());
+      const nonDoubledLastMonth = activeNames.filter(n => !prevDoubled.includes(n.toLowerCase()));
+      const doubledLastMonth = activeNames.filter(n => prevDoubled.includes(n.toLowerCase()));
+
+      // Putaran 1: Semua penghuni aktif dapat tepat 1x dulu (yang tidak double bulan lalu ditaruh di depan agar jika ada putaran ke-2 di Minggu 5, mereka yang maju, BUKAN yang bulan lalu sudah double!)
+      const firstPass = [...shuffle(nonDoubledLastMonth), ...shuffle(doubledLastMonth)];
+      // Putaran 2 (jika bulan punya 5 minggu & butuh 2 orang tambahan): HANYA ambil dari yang bulan lalu BELUM kena double!
+      const secondPass = [...shuffle(nonDoubledLastMonth), ...shuffle(doubledLastMonth)];
+      const fullQueue = [...firstPass, ...secondPass];
+
+      let cursor = 0;
+      const appearanceCount = {};
+
+      return monthWeeks.map((w, idx) => {
+        const perWeek = slots[idx] || 2;
+        const picked = [];
+        while (picked.length < perWeek && cursor < fullQueue.length) {
+          const candidate = fullQueue[cursor++];
+          if (candidate && !picked.includes(candidate)) {
+            picked.push(candidate);
+            appearanceCount[candidate] = (appearanceCount[candidate] || 0) + 1;
+          }
+        }
+        const hasDouble = picked.some(n => appearanceCount[n] > 1);
+        const isTitip = perWeek > 2;
+        const note = isTitip
+          ? `Titip +${perWeek - 2} orang (${perWeek} petugas) agar semua 1x sebulan`
+          : (hasDouble ? `Rotasi lintas-bulan (bebas double bulan depan)` : `Giliran normal (${picked.length} orang)`);
+        return {
+          ...w,
+          week: w.weekLabel,
+          day: 'Minggu',
+          assignees: picked.join(', '),
+          status: 'Terjadwal',
+          note,
+        };
       });
     }
 
@@ -1048,7 +1132,7 @@
         return currentMonthlySchedules;
       }
 
-      if (saved && saved.length === monthWeeks.length && saved._activeKey === activeNames.join('|')) {
+      if (saved && saved.length === monthWeeks.length) {
         currentMonthlySchedules = monthWeeks.map((w, idx) => ({
           ...saved[idx],
           ...w,
@@ -1056,33 +1140,8 @@
         return currentMonthlySchedules;
       }
 
-      // Bagi rata seluruh penghuni aktif dari Minggu 1 sampai Minggu Akhir secara otomatis
-      const slots = distributeSlots_(activeNames.length, monthWeeks.length);
-      const pool = activeNames.length > 0 ? [...activeNames] : ['Belum ada penghuni'];
-      let cursor = 0;
-
-      currentMonthlySchedules = monthWeeks.map((w, idx) => {
-        const countForWeek = slots[idx] || 1;
-        const picked = [];
-        for (let k = 0; k < countForWeek; k++) {
-          const candidate = pool[cursor % pool.length];
-          if (!picked.includes(candidate)) picked.push(candidate);
-          cursor++;
-        }
-        return {
-          ...w,
-          week: w.weekLabel,
-          day: 'Minggu',
-          assignees: picked.join(', '),
-          status: 'Terjadwal',
-          note: `Otomatis (${picked.length} orang)`,
-        };
-      });
-
-      try {
-        const toSave = [...currentMonthlySchedules];
-        localStorage.setItem(storageKey, JSON.stringify(toSave));
-      } catch (e) {}
+      currentMonthlySchedules = allocateFairMonthlyNames_(ym, monthWeeks, activeNames, false);
+      try { localStorage.setItem(storageKey, JSON.stringify(currentMonthlySchedules)); } catch (e) {}
       return currentMonthlySchedules;
     }
 
@@ -1118,44 +1177,13 @@
       const activeNames = (appData?.residents || []).filter(r => r.status === 'Aktif').map(r => r.name);
       if (activeNames.length === 0) return showToast('Tidak ada penghuni aktif', true);
 
-      const slots = distributeSlots_(activeNames.length, monthWeeks.length);
-      const shuffle = (arr) => {
-        const copy = [...arr];
-        for (let i = copy.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [copy[i], copy[j]] = [copy[j], copy[i]];
-        }
-        return copy;
-      };
-
-      let queue = shuffle(activeNames);
-      currentMonthlySchedules = monthWeeks.map((w, idx) => {
-        const perWeek = slots[idx] || 2;
-        const picked = [];
-        while (picked.length < perWeek) {
-          if (queue.length === 0) {
-            queue = shuffle(activeNames.filter(n => !picked.includes(n)));
-          }
-          const candidate = queue.shift();
-          if (candidate && !picked.includes(candidate)) {
-            picked.push(candidate);
-          }
-        }
-        return {
-          ...w,
-          week: w.weekLabel,
-          day: 'Minggu',
-          assignees: picked.join(', '),
-          status: 'Terjadwal',
-          note: `Diacak adil otomatis (${picked.length} orang)`,
-        };
-      });
+      currentMonthlySchedules = allocateFairMonthlyNames_(ym, monthWeeks, activeNames, true);
 
       persistMonthlyPiket(
         ym,
         'saveMonthlyPiket',
         { monthYear: ym, schedules: currentMonthlySchedules },
-        `Jadwal piket ${monthWeeks.length} minggu (${fmtMonthIndo(ym)}) berhasil diacak otomatis!`
+        `Jadwal piket ${monthWeeks.length} minggu (${fmtMonthIndo(ym)}) berhasil diacak adil!`
       );
     }
 
