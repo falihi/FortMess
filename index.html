@@ -652,7 +652,9 @@
       const unpaidTotal = unpaidCount * duesAmount;
       const projectedBalance = Number(summary.balance || 0) + unpaidTotal;
 
-      document.getElementById('valBalance').textContent = fmtRp(summary.balance);
+      const balEl = document.getElementById('valBalance');
+      balEl.textContent = fmtRp(summary.balance);
+      balEl.className = `text-2xl sm:text-3xl font-extrabold mt-2 ${Number(summary.balance) < 0 ? 'text-rose-600' : 'text-stone-900'}`;
       document.getElementById('valIncome').textContent = fmtRp(summary.totalIncome);
       document.getElementById('valExpense').textContent = fmtRp(summary.totalExpense);
       document.getElementById('valProjected').innerHTML = `Jika ${unpaidCount} orang yang belum bayar (${fmtMonthIndo(selectedMonth)}) melunasi: <strong class="text-stone-800">${fmtRp(projectedBalance)}</strong>`;
@@ -725,7 +727,7 @@
           </td>
           <td class="py-3.5 px-4 text-right whitespace-nowrap font-bold text-emerald-700">${isIn ? fmtRp(t.nominal) : '-'}</td>
           <td class="py-3.5 px-4 text-right whitespace-nowrap font-bold text-rose-600">${!isIn ? fmtRp(t.nominal) : '-'}</td>
-          <td class="py-3.5 px-4 text-right whitespace-nowrap font-extrabold text-stone-900">${fmtRp(t.runningBalance)}</td>
+          <td class="py-3.5 px-4 text-right whitespace-nowrap font-extrabold ${t.runningBalance < 0 ? 'text-rose-600' : 'text-stone-900'}">${fmtRp(t.runningBalance)}</td>
           ${adminPin ? `
           <td class="py-3.5 px-4 text-right whitespace-nowrap">
             ${isDuesTrx
