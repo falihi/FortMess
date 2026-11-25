@@ -5,18 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FortMess — Kas & Iuran Mes Putra Fortress</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
-  <div class="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
-    <!-- Header -->
-    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-      <div>
-        <h1 class="text-xl font-bold text-slate-900">FortMess — Kas Mes Putra Fortress</h1>
-        <p class="text-xs text-slate-500">Transparansi Kas & Iuran Bulanan (Rp 80.000 / jatuh tempo tgl 30)</p>
+<body class="bg-slate-100 text-slate-800 min-h-screen antialiased">
+  <div class="max-w-4xl mx-auto p-4 sm:p-6 space-y-5">
+    <!-- Hero Header -->
+    <header class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-5 sm:p-6 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 font-extrabold text-sm border border-emerald-500/30">FM</span>
+          <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight">FortMess</h1>
+        </div>
+        <p id="headerSubtitle" class="text-xs text-slate-300">Transparansi Kas & Iuran Bulanan (jatuh tempo tgl 30)</p>
       </div>
-      <div class="flex items-center gap-2">
-        <span id="roleBadge" class="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-medium">Mode: Penghuni (Read-Only)</span>
-        <button id="btnAdminAuth" onclick="promptAdminPin()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition">
+      <div class="flex items-center gap-2.5">
+        <span id="roleBadge" class="text-xs px-3 py-1.5 rounded-full bg-white/10 text-slate-200 font-medium backdrop-blur-sm border border-white/10">Mode: Penghuni</span>
+        <button id="btnAdminAuth" onclick="promptAdminPin()" class="text-xs px-4 py-1.5 rounded-full bg-emerald-500 text-slate-950 font-semibold hover:bg-emerald-400 transition shadow-sm">
           Login Bendahara
         </button>
       </div>
@@ -31,29 +38,53 @@
     </div>
 
     <!-- Main Content -->
-    <main id="mainContent" class="hidden space-y-6">
+    <main id="mainContent" class="hidden space-y-5">
       <!-- Summary Cards -->
-      <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-xs text-slate-500">Saldo Kas Saat Ini</p>
-          <p id="valBalance" class="text-2xl font-bold text-slate-900 mt-1">Rp 0</p>
+      <section class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Saldo Kas</p>
+          <p id="valBalance" class="text-2xl font-extrabold text-slate-900 mt-1.5">Rp 0</p>
         </div>
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-xs text-slate-500">Total Pemasukan</p>
-          <p id="valIncome" class="text-xl font-semibold text-emerald-600 mt-1">Rp 0</p>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Pemasukan</p>
+          <p id="valIncome" class="text-xl font-bold text-emerald-600 mt-1.5">Rp 0</p>
         </div>
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <p class="text-xs text-slate-500">Total Pengeluaran</p>
-          <p id="valExpense" class="text-xl font-semibold text-rose-600 mt-1">Rp 0</p>
+        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition">
+          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Pengeluaran</p>
+          <p id="valExpense" class="text-xl font-bold text-rose-600 mt-1.5">Rp 0</p>
         </div>
+      </section>
+
+      <!-- Info Rekening Transfer -->
+      <section class="bg-blue-50/70 p-4 rounded-2xl border border-blue-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <p class="text-xs font-semibold text-blue-900">Rekening Pembayaran Iuran</p>
+          <p id="valPaymentInfo" class="text-sm font-bold text-blue-800 mt-0.5">-</p>
+        </div>
+        <button onclick="copyPaymentInfo()" class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 self-start sm:self-center">
+          Copy No. Rekening
+        </button>
       </section>
 
       <!-- Admin Panel (Hidden by default) -->
       <section id="adminPanel" class="hidden bg-amber-50/60 p-5 rounded-2xl border border-amber-200 space-y-4">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-sm font-bold text-amber-900">Panel Bendahara</h2>
-          <button onclick="copyWaReminder()" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
-            Copy Rekap WA
+          <div class="flex items-center gap-2">
+            <input id="inputDuesAmount" type="number" min="1000" placeholder="Tarif Iuran" class="w-28 px-2.5 py-1 text-xs rounded-lg border border-amber-300 bg-white" />
+            <button onclick="updateDuesAmount()" class="text-xs px-2.5 py-1.5 rounded-lg bg-amber-700 text-white hover:bg-amber-800">
+              Simpan Tarif
+            </button>
+            <button onclick="copyWaReminder()" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+              Copy Rekap WA
+            </button>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="inputPaymentInfo" type="text" placeholder="Contoh: BCA 1234567890 a.n. Falih" class="flex-1 min-w-[200px] px-3 py-1.5 text-xs rounded-lg border border-amber-300 bg-white" />
+          <button onclick="updatePaymentInfo()" class="text-xs px-3 py-1.5 rounded-lg bg-amber-700 text-white hover:bg-amber-800">
+            Simpan Rekening
           </button>
         </div>
 
@@ -87,6 +118,21 @@
         <div id="residentsList" class="divide-y divide-slate-100 text-sm"></div>
       </section>
 
+      <!-- Jadwal Piket Mingguan -->
+      <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-sm font-bold text-slate-900">Jadwal Piket Mingguan</h2>
+          <div id="piketAdminBtns" class="hidden flex flex-wrap items-center gap-2">
+            <input id="piketCount" type="number" min="1" max="10" value="2" class="w-14 px-2 py-1 text-xs rounded-lg border border-slate-300" title="Jumlah orang" />
+            <button onclick="generatePiket()" class="text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700">Acak Petugas</button>
+            <button onclick="changePiketDay()" class="text-xs px-2.5 py-1 rounded-lg border border-slate-300 hover:bg-slate-100">Ganti Hari</button>
+            <button onclick="swapPiket()" class="text-xs px-2.5 py-1 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50">Tukar Orang</button>
+            <button onclick="markPiketDone()" class="text-xs px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Tandai Selesai</button>
+          </div>
+        </div>
+        <div id="piketList" class="text-sm"></div>
+      </section>
+
       <!-- Buku Kas -->
       <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
         <div class="flex items-center justify-between">
@@ -103,6 +149,7 @@
     let adminPin = null;
 
     const fmtRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
+    const escHtml = (s) => String(s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 
     function showToast(msg, isError = false) {
       const el = document.getElementById('toast');
@@ -137,6 +184,10 @@
     function renderDashboard() {
       if (!appData) return;
       const { summary, residents, dues, transactions } = appData;
+      document.getElementById('headerSubtitle').textContent = `Transparansi Kas & Iuran Bulanan (${fmtRp(summary.duesAmount)} / jatuh tempo tgl 30)`;
+      document.getElementById('inputDuesAmount').value = summary.duesAmount;
+      document.getElementById('valPaymentInfo').textContent = summary.paymentInfo || 'Belum diatur oleh Bendahara';
+      document.getElementById('inputPaymentInfo').value = summary.paymentInfo || '';
       document.getElementById('valBalance').textContent = fmtRp(summary.balance);
       document.getElementById('valIncome').textContent = fmtRp(summary.totalIncome);
       document.getElementById('valExpense').textContent = fmtRp(summary.totalExpense);
@@ -148,30 +199,51 @@
         return `
           <div class="py-2.5 flex items-center justify-between">
             <div>
-              <p class="font-medium text-slate-800">${r.name}</p>
-              <p class="text-xs text-slate-400">${r.id}</p>
+              <p class="font-medium text-slate-800">${escHtml(r.name)}</p>
+              <p class="text-xs text-slate-400">${escHtml(r.id)}</p>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-xs px-2.5 py-1 rounded-full font-medium ${paid ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
                 ${paid ? 'Lunas' : 'Belum Bayar'}
               </span>
-              ${(!paid && adminPin) ? `<button onclick="markPaid('${r.id}', '${r.name}')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700">Verifikasi</button>` : ''}
+              ${(!paid && adminPin) ? `<button onclick="markPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700">Verifikasi</button>` : ''}
             </div>
           </div>`;
       }).join('');
       document.getElementById('residentsList').innerHTML = resHtml || '<p class="py-4 text-center text-slate-400 text-xs">Belum ada penghuni aktif.</p>';
 
-      const trxHtml = transactions.slice(0, 30).map(t => `
-        <div class="py-2.5 flex items-center justify-between">
+      const trxHtml = transactions.slice(0, 30).map(t => {
+        const safeUrl = (t.proofUrl && t.proofUrl.startsWith('https://')) ? escHtml(t.proofUrl) : '';
+        return `
+        <div class="py-2.5 flex items-center justify-between gap-2">
           <div>
-            <p class="font-medium text-slate-800">${t.description} <span class="text-slate-400">(${t.category})</span></p>
-            <p class="text-slate-400">${t.date} • ${t.id} ${t.proofUrl ? `• <a href="${t.proofUrl}" target="_blank" class="text-blue-600 underline">Lihat Bukti</a>` : ''}</p>
+            <p class="font-medium text-slate-800">${escHtml(t.description)} <span class="text-slate-400">(${escHtml(t.category)})</span></p>
+            <p class="text-slate-400">${escHtml(t.date)} • ${escHtml(t.id)} ${safeUrl ? `• <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline">Lihat Bukti</a>` : ''}</p>
           </div>
-          <span class="font-semibold ${t.type === 'Pemasukan' ? 'text-emerald-600' : 'text-rose-600'}">
-            ${t.type === 'Pemasukan' ? '+' : '-'}${fmtRp(t.nominal)}
-          </span>
-        </div>`).join('');
+          <div class="flex items-center gap-2">
+            <span class="font-semibold ${t.type === 'Pemasukan' ? 'text-emerald-600' : 'text-rose-600'}">
+              ${t.type === 'Pemasukan' ? '+' : '-'}${fmtRp(t.nominal)}
+            </span>
+            ${adminPin ? `<button onclick="deleteTrx('${escHtml(t.id)}')" class="text-xs text-rose-500 hover:underline">Hapus</button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
       document.getElementById('ledgerList').innerHTML = trxHtml || '<p class="py-4 text-center text-slate-400">Belum ada transaksi di bulan ini.</p>';
+
+      const piket = (appData.piket || [])[0];
+      if (piket) {
+        document.getElementById('piketList').innerHTML = `
+          <div class="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <p class="text-xs font-semibold text-emerald-800">Jadwal: ${escHtml(piket.day)} (${escHtml(piket.week)})</p>
+              <p class="text-base font-bold text-slate-900 mt-0.5">${escHtml(piket.assignees)}</p>
+              ${piket.note ? `<p class="text-xs text-slate-500 mt-0.5">${escHtml(piket.note)}</p>` : ''}
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-600 text-white font-medium self-start sm:self-center">${escHtml(piket.status)}</span>
+          </div>`;
+      } else {
+        document.getElementById('piketList').innerHTML = '<p class="py-3 text-center text-slate-400 text-xs">Jadwal piket mingguan belum diatur.</p>';
+      }
     }
 
     function promptAdminPin() {
@@ -181,9 +253,10 @@
         .withSuccessHandler((res) => {
           if (res.ok) {
             adminPin = pin;
-            document.getElementById('roleBadge').textContent = 'Mode: Bendahara (Admin)';
-            document.getElementById('roleBadge').className = 'text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-medium';
+            document.getElementById('roleBadge').textContent = 'Mode: Bendahara';
+            document.getElementById('roleBadge').className = 'text-xs px-3 py-1.5 rounded-full bg-amber-400/20 text-amber-300 font-semibold border border-amber-400/30';
             document.getElementById('adminPanel').classList.remove('hidden');
+            document.getElementById('piketAdminBtns').classList.remove('hidden');
             document.getElementById('btnAdminAuth').classList.add('hidden');
             renderDashboard();
             showToast('Login Bendahara berhasil');
@@ -203,47 +276,181 @@
       });
     }
 
-    async function submitTransaction(e) {
-      e.preventDefault();
-      const fileInput = document.getElementById('trxProof');
-      const file = fileInput.files[0];
-      let proof = null;
-      if (file) {
-        if (file.size > 2 * 1024 * 1024) {
-          return showToast('Ukuran gambar maksimal 2 MB', true);
-        }
-        const base64 = await readFileAsBase64(file);
-        proof = { base64, mimeType: file.type, fileName: file.name };
-      }
-
-      const payload = {
-        action: 'addTransaction',
-        pin: adminPin,
-        data: {
-          type: document.getElementById('trxType').value,
-          category: document.getElementById('trxCategory').value,
-          description: document.getElementById('trxDesc').value,
-          nominal: document.getElementById('trxNominal').value,
-          proof,
-        },
-      };
+    function generatePiket() {
+      const count = document.getElementById('piketCount').value || 2;
+      const dayName = prompt('Hari pelaksanaan piket minggu ini (misal: Minggu atau Jumat Malam):', 'Minggu');
+      if (!dayName) return;
       google.script.run
         .withSuccessHandler((res) => {
           if (res.ok) {
             appData = res.data;
-            document.getElementById('trxForm').reset();
             renderDashboard();
-            showToast('Transaksi berhasil dicatat');
+            showToast('Petugas piket berhasil diacak!');
           } else {
             showToast(res.error, true);
           }
         })
-        .handleAction(payload);
+        .handleAction({ action: 'generateWeeklyPiket', pin: adminPin, data: { count, dayName } });
+    }
+
+    function changePiketDay() {
+      const dayName = prompt('Ganti hari piket menjadi (misal: Jumat Malam):', 'Jumat Malam');
+      if (!dayName) return;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            appData = res.data;
+            renderDashboard();
+            showToast(`Hari piket diganti ke ${dayName}`);
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction({ action: 'updatePiketDay', pin: adminPin, data: { dayName } });
+    }
+
+    function markPiketDone() {
+      if (!confirm('Tandai piket minggu ini sudah Selesai?')) return;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            appData = res.data;
+            renderDashboard();
+            showToast('Piket minggu ini ditandai Selesai!');
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction({ action: 'markPiketDone', pin: adminPin, data: {} });
+    }
+
+    function swapPiket() {
+      const oldName = prompt('Siapa yang berhalangan / mau tuker?');
+      if (!oldName) return;
+      const newName = prompt(`Diganti oleh siapa?`);
+      if (!newName) return;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            appData = res.data;
+            renderDashboard();
+            showToast(`Piket ${oldName} ditukar dengan ${newName}`);
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction({ action: 'swapPiketMember', pin: adminPin, data: { oldName: oldName.trim(), newName: newName.trim() } });
+    }
+
+    function deleteTrx(id) {
+      if (!confirm(`Hapus transaksi ${id}?`)) return;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            appData = res.data;
+            renderDashboard();
+            showToast('Transaksi dihapus');
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction({ action: 'deleteTransaction', pin: adminPin, data: { id } });
+    }
+
+    async function submitTransaction(e) {
+      e.preventDefault();
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+      try {
+        const fileInput = document.getElementById('trxProof');
+        const file = fileInput.files[0];
+        let proof = null;
+        if (file) {
+          if (file.size > 2 * 1024 * 1024) {
+            return showToast('Ukuran gambar maksimal 2 MB', true);
+          }
+          const base64 = await readFileAsBase64(file);
+          proof = { base64, mimeType: file.type, fileName: file.name };
+        }
+
+        const payload = {
+          action: 'addTransaction',
+          pin: adminPin,
+          data: {
+            type: document.getElementById('trxType').value,
+            category: document.getElementById('trxCategory').value,
+            description: document.getElementById('trxDesc').value,
+            nominal: document.getElementById('trxNominal').value,
+            proof,
+          },
+        };
+        google.script.run
+          .withSuccessHandler((res) => {
+            btn.disabled = false;
+            btn.textContent = '+ Catat Transaksi';
+            if (res.ok) {
+              appData = res.data;
+              document.getElementById('trxForm').reset();
+              renderDashboard();
+              showToast('Transaksi berhasil dicatat');
+            } else {
+              showToast(res.error, true);
+            }
+          })
+          .withFailureHandler((err) => {
+            btn.disabled = false;
+            btn.textContent = '+ Catat Transaksi';
+            showToast('Gagal: ' + err.message, true);
+          })
+          .handleAction(payload);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '+ Catat Transaksi';
+        showToast('Error: ' + err.message, true);
+      }
+    }
+
+    function copyPaymentInfo() {
+      const info = appData?.summary?.paymentInfo || '';
+      if (!info) return showToast('Info rekening belum diatur', true);
+      navigator.clipboard.writeText(info).then(() => showToast('Info rekening disalin!'));
+    }
+
+    function updatePaymentInfo() {
+      const paymentInfo = document.getElementById('inputPaymentInfo').value;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            appData = res.data;
+            renderDashboard();
+            showToast('Info rekening berhasil disimpan');
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction({ action: 'updatePaymentInfo', pin: adminPin, data: { paymentInfo } });
+    }
+
+    function updateDuesAmount() {
+      const amount = document.getElementById('inputDuesAmount').value;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            appData = res.data;
+            renderDashboard();
+            showToast('Tarif iuran berhasil diperbarui');
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction({ action: 'updateDuesAmount', pin: adminPin, data: { amount } });
     }
 
     function markPaid(residentId, residentName) {
       const monthYear = document.getElementById('monthFilter').value;
-      if (!confirm(`Verifikasi iuran ${residentName} untuk bulan ${monthYear} (Rp 80.000)?`)) return;
+      const amount = appData?.summary?.duesAmount || 80000;
+      if (!confirm(`Verifikasi iuran ${residentName} untuk bulan ${monthYear} (${fmtRp(amount)})?`)) return;
       google.script.run
         .withSuccessHandler((res) => {
           if (res.ok) {
@@ -254,17 +461,19 @@
             showToast(res.error, true);
           }
         })
-        .handleAction({ action: 'verifyAuth' && 'markDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear, amount: 80000 } });
+        .handleAction({ action: 'markDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear, amount } });
     }
 
     function copyWaReminder() {
       const month = document.getElementById('monthFilter').value;
+      const amount = appData?.summary?.duesAmount || 80000;
       const unpaid = appData.residents
         .filter(r => r.status === 'Aktif')
         .filter(r => !appData.dues.find(d => d.residentId === r.id && d.month === month && d.status === 'Lunas'));
+      const payInfo = appData?.summary?.paymentInfo || '-';
       const text = `*REKAP IURAN MES FORTRESS (${month})*\nBelum bayar (${unpaid.length} orang):\n` +
-        unpaid.map((r, i) => `${i + 1}. ${r.name} (Rp 80.000)`).join('\n') +
-        `\n\nMohon segera dilunasi sebelum tgl 30 ya. Terima kasih!`;
+        unpaid.map((r, i) => `${i + 1}. ${r.name} (${fmtRp(amount)})`).join('\n') +
+        `\n\nTransfer ke:\n${payInfo}\nMohon segera dilunasi sebelum tgl 30 ya. Terima kasih!`;
       navigator.clipboard.writeText(text).then(() => showToast('Rekap WA disalin ke clipboard!'));
     }
 
