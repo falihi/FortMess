@@ -29,6 +29,9 @@
         <button id="btnAdminAuth" type="button" onclick="togglePinBox()" class="text-xs px-4 py-2 rounded-full bg-emerald-500 text-stone-950 font-bold hover:bg-emerald-400 transition">
           🔐 Masuk Bendahara
         </button>
+        <button id="btnAdminLogout" type="button" onclick="logoutAdmin()" class="hidden text-xs px-3.5 py-1.5 rounded-full bg-white/10 text-stone-200 hover:bg-white/20 border border-white/15 font-semibold transition">
+          Keluar
+        </button>
         <form id="pinLoginForm" onsubmit="submitPinLogin(event)" class="hidden flex items-center gap-1.5 bg-white/10 p-1 rounded-full border border-white/15">
           <input id="inputAdminPin" type="password" placeholder="Ketik PIN..." class="w-28 px-3 py-1 text-xs rounded-full bg-white text-stone-900 focus:outline-none" />
           <button id="btnPinSubmit" type="submit" class="text-xs px-3.5 py-1 rounded-full bg-emerald-500 text-stone-950 font-bold hover:bg-emerald-400">Buka</button>
@@ -519,8 +522,10 @@
           btn.textContent = 'Buka';
           if (res && res.ok) {
             adminPin = pin;
+            document.getElementById('inputAdminPin').value = '';
             document.getElementById('pinLoginForm').classList.add('hidden');
             document.getElementById('btnAdminAuth').classList.add('hidden');
+            document.getElementById('btnAdminLogout').classList.remove('hidden');
             document.getElementById('roleBadge').textContent = '✍️ Mode Bendahara';
             document.getElementById('roleBadge').className = 'text-xs px-3 py-1.5 rounded-full bg-amber-400/20 text-amber-300 font-bold border border-amber-400/30';
             document.getElementById('adminSettingsPanel').classList.remove('hidden');
@@ -540,6 +545,24 @@
           showToast('Error: ' + err.message, true);
         }
       );
+    }
+
+    function logoutAdmin() {
+      adminPin = null;
+      cancelEditTrx();
+      cancelEditResident();
+      document.getElementById('btnAdminLogout').classList.add('hidden');
+      document.getElementById('btnAdminAuth').classList.remove('hidden');
+      document.getElementById('roleBadge').textContent = '👀 Mode Lihat Saja';
+      document.getElementById('roleBadge').className = 'text-xs px-3 py-1.5 rounded-full bg-white/10 text-stone-200 font-medium border border-white/10';
+      document.getElementById('adminSettingsPanel').classList.add('hidden');
+      document.getElementById('adminPanel').classList.add('hidden');
+      document.getElementById('residentAdminToolbar').classList.add('hidden');
+      document.getElementById('residentForm').classList.add('hidden');
+      document.getElementById('piketAdminBtns').classList.add('hidden');
+      document.getElementById('thLedgerAction').classList.add('hidden');
+      renderDashboard();
+      showToast('Keluar dari Mode Bendahara');
     }
 
     function saveCache(data) {
@@ -672,8 +695,11 @@
         document.getElementById('thLedgerAction').classList.remove('hidden');
       }
 
-      // Hitung running balance kronologis
-      const chronological = [...transactions].reverse();
+      // Hitung running balance kronologis berdasarkan Tanggal (agar transaksi susulan/backdate tidak mengacaukan urutan saldo)
+      const chronological = [...transactions]
+        .reverse()
+        .map((t, idx) => ({ ...t, _origOrder: idx }))
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)) || (a._origOrder - b._origOrder));
       let running = 0;
       const withBalance = chronological.map(t => {
         running += (t.type === 'Pemasukan' ? Number(t.nominal || 0) : -Number(t.nominal || 0));
@@ -1205,14 +1231,42 @@
       navigator.clipboard.writeText(text).then(() => showToast('Pesan tagihan WA disalin!'));
     }
 
+    function sanitizeCsvCell(val) {
+      const s = String(val == null ? '' : val).replace(/"/g, '""');
+      const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
+      return `"${safe}"`;
+    }
+
     function exportCsv() {
-      const rows = [['ID', 'Tanggal', 'Tipe', 'Kategori', 'Keterangan', 'Qty', 'Nominal']];
-      (appData?.transactions || []).forEach(t => rows.push([t.id, t.date, t.type, t.category, `"${t.description}"`, t.qty || '', t.nominal]));
+      const filterMonth = document.getElementById('ledgerMonthFilter').value || 'ALL';
+      const chronological = [...(appData?.transactions || [])]
+        .reverse()
+        .map((t, idx) => ({ ...t, _origOrder: idx }))
+        .sort((a, b) => String(a.date).localeCompare(String(b.date)) || (a._origOrder - b._origOrder));
+      let running = 0;
+      const withBalance = chronological.map(t => {
+        running += (t.type === 'Pemasukan' ? Number(t.nominal || 0) : -Number(t.nominal || 0));
+        return { ...t, runningBalance: running };
+      }).reverse();
+      const filtered = filterMonth === 'ALL' ? withBalance : withBalance.filter(t => String(t.date).startsWith(filterMonth));
+
+      const rows = [['ID', 'Tanggal', 'Tipe', 'Kategori', 'Keterangan', 'Qty', 'Nominal', 'Sisa_Saldo']];
+      filtered.forEach(t => rows.push([
+        sanitizeCsvCell(t.id),
+        sanitizeCsvCell(t.date),
+        sanitizeCsvCell(t.type),
+        sanitizeCsvCell(t.category),
+        sanitizeCsvCell(t.description),
+        t.qty || '',
+        t.nominal,
+        t.runningBalance,
+      ]));
       const csv = rows.map(r => r.join(',')).join('\n');
-      const blob = new Blob([csv], { type: 'text/csv' });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `kas-fortmess-${new Date().toISOString().slice(0, 10)}.csv`;
+      const suffix = filterMonth === 'ALL' ? 'semua-bulan' : filterMonth;
+      a.download = `kas-fortmess-${suffix}.csv`;
       a.click();
     }
 

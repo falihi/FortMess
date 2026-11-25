@@ -262,14 +262,11 @@ function handleAction(payload) {
   const cache = CacheService.getScriptCache();
   const failKey = 'PIN_FAIL_COUNT';
   const fails = Number(cache.get(failKey) || 0);
-  if (fails >= 5) {
-    return { ok: false, error: 'Terlalu banyak percobaan PIN salah. Coba lagi dalam 5 menit.' };
-  }
-
   if (!verifyAdmin_(pin)) {
+    Utilities.sleep(1200); // Tahan brute-force tanpa mengunci Bendahara asli yang tahu PIN benar
     cache.put(failKey, String(fails + 1), 300);
-    logAudit('Anonymous', 'AUTH_FAILED', `Percobaan akses ${action} (${fails + 1}/5)`);
-    return { ok: false, error: 'PIN Admin salah atau tidak valid.' };
+    logAudit('Anonymous', 'AUTH_FAILED', `Percobaan akses ${action} (gagal ke-${fails + 1})`);
+    return { ok: false, error: 'PIN Bendahara salah atau tidak valid.' };
   }
   cache.remove(failKey);
 
@@ -379,6 +376,17 @@ function handleAction(payload) {
     }
 
     if (action === 'deleteResident') {
+      const duesSheet = ss.getSheetByName(SHEET_NAMES.DUES);
+      if (duesSheet && duesSheet.getLastRow() >= 2) {
+        const dRows = duesSheet.getDataRange().getValues();
+        const hasHistory = dRows.slice(1).some(r => String(r[0]) === String(data.id));
+        if (hasHistory) {
+          return {
+            ok: false,
+            error: 'Penghuni ini sudah memiliki riwayat pembayaran iuran. Gunakan tombol "Non-Aktifkan" agar histori kas tetap utuh.',
+          };
+        }
+      }
       const resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
       const rows = resSheet.getDataRange().getValues();
       for (let i = 1; i < rows.length; i++) {
@@ -473,19 +481,25 @@ function handleAction(payload) {
       const rows = sheet.getDataRange().getValues();
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][0]) === String(data.id)) {
+          const trxId = String(rows[i][0]);
           const desc = String(rows[i][4] || '');
           trashDriveFileByUrl_(rows[i][8]);
           sheet.deleteRow(i + 1);
 
-          // Jika transaksi yang dihapus adalah Iuran Bulanan, sinkronkan hapus dari Matriks_Iuran
-          const m = desc.match(/^Iuran\s+(.+)\s+\((\d{4}-\d{2})\)$/i);
-          if (m) {
-            const targetName = m[1].trim().toLowerCase();
-            const targetMonth = m[2];
+          // Sinkronkan hapus dari Matriks_Iuran berdasarkan Foreign Key ID (IUR-Rxx-YYYY-MM) atau deskripsi
+          const idMatch = trxId.match(/^IUR-(R\d+)-(\d{4}-\d{2})$/i);
+          const descMatch = desc.match(/^Iuran\s+(.+)\s+\((\d{4}-\d{2})\)$/i);
+          if (idMatch || descMatch) {
             const duesSheet = ss.getSheetByName(SHEET_NAMES.DUES);
             const dRows = duesSheet.getDataRange().getValues();
             for (let j = dRows.length - 1; j >= 1; j--) {
-              if (String(dRows[j][1]).trim().toLowerCase() === targetName && fmtMonth_(dRows[j][2]) === targetMonth) {
+              const rowResId = String(dRows[j][0]).trim();
+              const rowName = String(dRows[j][1]).trim().toLowerCase();
+              const rowMonth = fmtMonth_(dRows[j][2]);
+              if (
+                (idMatch && rowResId === idMatch[1] && rowMonth === idMatch[2]) ||
+                (descMatch && rowName === descMatch[1].trim().toLowerCase() && rowMonth === descMatch[2])
+              ) {
                 duesSheet.deleteRow(j + 1);
                 break;
               }
@@ -515,7 +529,7 @@ function handleAction(payload) {
       const today = new Date().toISOString().slice(0, 10);
       duesSheet.appendRow([residentId, residentName, String(monthYear), payAmount, 'Lunas', today, actor]);
 
-      const trxId = 'IUR-' + Date.now().toString().slice(-6);
+      const trxId = `IUR-${residentId}-${monthYear}`;
       ledgerSheet.appendRow([
         trxId,
         today,
@@ -534,7 +548,7 @@ function handleAction(payload) {
 
     if (action === 'unmarkDuesPaid') {
       const duesSheet = ss.getSheetByName(SHEET_NAMES.DUES);
-      const ledgerSheet = ss.getSheetByName(SHEET_NAMES.LEDGER);
+      const ledgerSheet = ss.getSheetByName(SHEET_NAMES.DUES ? SHEET_NAMES.LEDGER : 'Buku_Kas');
       const { residentId, residentName, monthYear } = data;
       const dRows = duesSheet.getDataRange().getValues();
       let found = false;
@@ -547,10 +561,13 @@ function handleAction(payload) {
       }
       if (!found) return { ok: false, error: 'Data lunas tidak ditemukan.' };
 
+      const targetId = `IUR-${residentId}-${monthYear}`.toLowerCase();
       const targetDesc = `Iuran ${residentName} (${monthYear})`.toLowerCase();
       const lRows = ledgerSheet.getDataRange().getValues();
       for (let j = lRows.length - 1; j >= 1; j--) {
-        if (String(lRows[j][4] || '').trim().toLowerCase() === targetDesc) {
+        const rowId = String(lRows[j][0] || '').trim().toLowerCase();
+        const rowDesc = String(lRows[j][4] || '').trim().toLowerCase();
+        if (rowId === targetId || rowDesc === targetDesc) {
           ledgerSheet.deleteRow(j + 1);
           break;
         }
