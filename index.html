@@ -361,7 +361,9 @@
 
   <script>
     window.__INITIAL_DATA__ = null;
-    const DEFAULT_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzjXvvFQ33QzE3DtkjS4vHNcmPnFtaQdpyA1p7A9_EFi1FwFGuyp-NGrThyHI0guhLDdg/exec';
+    // Fallback untuk file HTML yang dibuka langsung. Saat lewat Apps Script,
+    // URL ini diisi otomatis oleh doGet() sesuai deployment yang aktif.
+    const DEFAULT_EXEC_URL = '';
     let appData = null;
     let adminPin = null;
     let editingTrxId = null;
@@ -477,7 +479,9 @@
     };
     const getDriveThumb = (url) => {
       const m = String(url || '').match(/\/d\/([a-zA-Z0-9_-]+)/) || String(url || '').match(/[?&]id=([a-zA-Z0-9_-]+)/);
-      return m ? `https://lh3.googleusercontent.com/d/${m[1]}=w120` : '';
+      // Hindari literal "https://" di inline script karena HtmlService GAS
+      // dapat memotongnya saat menyajikan HTML sebagai Web App.
+      return m ? ['https:', '', 'lh3.googleusercontent.com/d', `${m[1]}=w120`].join('/') : '';
     };
 
     function showToast(msg, isError = false) {
@@ -767,7 +771,7 @@
         `Masuk: <strong class="text-emerald-700">${fmtRp(periodIn)}</strong> • Keluar: <strong class="text-rose-600">${fmtRp(periodOut)}</strong>`;
 
       const trxHtml = filteredTrx.map(t => {
-        const safeUrl = (t.proofUrl && t.proofUrl.startsWith('https://')) ? escHtml(t.proofUrl) : '';
+        const safeUrl = (t.proofUrl && t.proofUrl.startsWith(['https:', '', ''].join('/'))) ? escHtml(t.proofUrl) : '';
         const thumbUrl = safeUrl ? getDriveThumb(t.proofUrl) : '';
         const isIn = t.type === 'Pemasukan';
         const isDuesTrx = String(t.id || '').startsWith('IUR-') || t.category === 'Iuran Bulanan';
