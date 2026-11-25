@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FortMess — Kas & Iuran Mes Putra Fortress</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+  <div class="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+      <div>
+        <h1 class="text-xl font-bold text-slate-900">FortMess — Kas Mes Putra Fortress</h1>
+        <p class="text-xs text-slate-500">Transparansi Kas & Iuran Bulanan (Rp 80.000 / jatuh tempo tgl 30)</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="roleBadge" class="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-medium">Mode: Penghuni (Read-Only)</span>
+        <button id="btnAdminAuth" onclick="promptAdminPin()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition">
+          Login Bendahara
+        </button>
+      </div>
+    </header>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition"></div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500 text-sm">
+      Memuat data kas dari Google Sheets...
+    </div>
+
+    <!-- Main Content -->
+    <main id="mainContent" class="hidden space-y-6">
+      <!-- Summary Cards -->
+      <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-xs text-slate-500">Saldo Kas Saat Ini</p>
+          <p id="valBalance" class="text-2xl font-bold text-slate-900 mt-1">Rp 0</p>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-xs text-slate-500">Total Pemasukan</p>
+          <p id="valIncome" class="text-xl font-semibold text-emerald-600 mt-1">Rp 0</p>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-xs text-slate-500">Total Pengeluaran</p>
+          <p id="valExpense" class="text-xl font-semibold text-rose-600 mt-1">Rp 0</p>
+        </div>
+      </section>
+
+      <!-- Admin Panel (Hidden by default) -->
+      <section id="adminPanel" class="hidden bg-amber-50/60 p-5 rounded-2xl border border-amber-200 space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-amber-900">Panel Bendahara</h2>
+          <button onclick="copyWaReminder()" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
+            Copy Rekap WA
+          </button>
+        </div>
+
+        <form id="trxForm" onsubmit="submitTransaction(event)" class="grid grid-cols-1 sm:grid-cols-5 gap-2">
+          <select id="trxType" class="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white">
+            <option value="Pengeluaran">Pengeluaran</option>
+            <option value="Pemasukan">Pemasukan</option>
+          </select>
+          <select id="trxCategory" class="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white">
+            <option value="Listrik">Token Listrik</option>
+            <option value="Galon">Air Galon</option>
+            <option value="Gas">Gas</option>
+            <option value="Kebersihan">Kebersihan</option>
+            <option value="Lainnya">Lainnya</option>
+          </select>
+          <input id="trxDesc" type="text" placeholder="Keterangan" required class="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white sm:col-span-2" />
+          <input id="trxNominal" type="number" placeholder="Nominal (Rp)" required min="1" class="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white" />
+          <input id="trxProof" type="file" accept="image/*" class="sm:col-span-5 text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300" />
+          <button type="submit" class="sm:col-span-5 py-2 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-700">
+            + Catat Transaksi
+          </button>
+        </form>
+      </section>
+
+      <!-- Daftar Penghuni Aktif & Iuran -->
+      <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-slate-900">Status Iuran Penghuni Aktif</h2>
+          <input id="monthFilter" type="month" onchange="renderDashboard()" class="text-xs px-2.5 py-1 rounded-lg border border-slate-300" />
+        </div>
+        <div id="residentsList" class="divide-y divide-slate-100 text-sm"></div>
+      </section>
+
+      <!-- Buku Kas -->
+      <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-slate-900">Riwayat Buku Kas</h2>
+          <button onclick="exportCsv()" class="text-xs px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-100">Export CSV</button>
+        </div>
+        <div id="ledgerList" class="divide-y divide-slate-100 text-xs"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let appData = null;
+    let adminPin = null;
+
+    const fmtRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
+
+    function showToast(msg, isError = false) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = `fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${isError ? 'bg-rose-600' : 'bg-emerald-600'}`;
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 3000);
+    }
+
+    function init() {
+      const now = new Date();
+      document.getElementById('monthFilter').value = now.toISOString().slice(0, 7);
+      loadData();
+    }
+
+    function loadData() {
+      if (typeof google !== 'undefined' && google.script) {
+        google.script.run
+          .withSuccessHandler((res) => {
+            appData = res;
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            renderDashboard();
+          })
+          .withFailureHandler((err) => showToast('Gagal memuat data: ' + err.message, true))
+          .getDashboardData();
+      } else {
+        document.getElementById('loadingState').textContent = 'Jalankan melalui Google Apps Script Web App untuk terhubung ke Google Sheets.';
+      }
+    }
+
+    function renderDashboard() {
+      if (!appData) return;
+      const { summary, residents, dues, transactions } = appData;
+      document.getElementById('valBalance').textContent = fmtRp(summary.balance);
+      document.getElementById('valIncome').textContent = fmtRp(summary.totalIncome);
+      document.getElementById('valExpense').textContent = fmtRp(summary.totalExpense);
+
+      const selectedMonth = document.getElementById('monthFilter').value;
+      const activeRes = residents.filter(r => r.status === 'Aktif');
+      const resHtml = activeRes.map(r => {
+        const paid = dues.find(d => d.residentId === r.id && d.month === selectedMonth && d.status === 'Lunas');
+        return `
+          <div class="py-2.5 flex items-center justify-between">
+            <div>
+              <p class="font-medium text-slate-800">${r.name}</p>
+              <p class="text-xs text-slate-400">${r.id}</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs px-2.5 py-1 rounded-full font-medium ${paid ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                ${paid ? 'Lunas' : 'Belum Bayar'}
+              </span>
+              ${(!paid && adminPin) ? `<button onclick="markPaid('${r.id}', '${r.name}')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700">Verifikasi</button>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+      document.getElementById('residentsList').innerHTML = resHtml || '<p class="py-4 text-center text-slate-400 text-xs">Belum ada penghuni aktif.</p>';
+
+      const trxHtml = transactions.slice(0, 30).map(t => `
+        <div class="py-2.5 flex items-center justify-between">
+          <div>
+            <p class="font-medium text-slate-800">${t.description} <span class="text-slate-400">(${t.category})</span></p>
+            <p class="text-slate-400">${t.date} • ${t.id} ${t.proofUrl ? `• <a href="${t.proofUrl}" target="_blank" class="text-blue-600 underline">Lihat Bukti</a>` : ''}</p>
+          </div>
+          <span class="font-semibold ${t.type === 'Pemasukan' ? 'text-emerald-600' : 'text-rose-600'}">
+            ${t.type === 'Pemasukan' ? '+' : '-'}${fmtRp(t.nominal)}
+          </span>
+        </div>`).join('');
+      document.getElementById('ledgerList').innerHTML = trxHtml || '<p class="py-4 text-center text-slate-400">Belum ada transaksi di bulan ini.</p>';
+    }
+
+    function promptAdminPin() {
+      const pin = prompt('Masukkan PIN Bendahara:');
+      if (!pin) return;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            adminPin = pin;
+            document.getElementById('roleBadge').textContent = 'Mode: Bendahara (Admin)';
+            document.getElementById('roleBadge').className = 'text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-medium';
+            document.getElementById('adminPanel').classList.remove('hidden');
+            document.getElementById('btnAdminAuth').classList.add('hidden');
+            renderDashboard();
+            showToast('Login Bendahara berhasil');
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction({ action: 'verifyAuth', pin });
+    }
+
+    function readFileAsBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function submitTransaction(e) {
+      e.preventDefault();
+      const fileInput = document.getElementById('trxProof');
+      const file = fileInput.files[0];
+      let proof = null;
+      if (file) {
+        if (file.size > 2 * 1024 * 1024) {
+          return showToast('Ukuran gambar maksimal 2 MB', true);
+        }
+        const base64 = await readFileAsBase64(file);
+        proof = { base64, mimeType: file.type, fileName: file.name };
+      }
+
+      const payload = {
+        action: 'addTransaction',
+        pin: adminPin,
+        data: {
+          type: document.getElementById('trxType').value,
+          category: document.getElementById('trxCategory').value,
+          description: document.getElementById('trxDesc').value,
+          nominal: document.getElementById('trxNominal').value,
+          proof,
+        },
+      };
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            appData = res.data;
+            document.getElementById('trxForm').reset();
+            renderDashboard();
+            showToast('Transaksi berhasil dicatat');
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction(payload);
+    }
+
+    function markPaid(residentId, residentName) {
+      const monthYear = document.getElementById('monthFilter').value;
+      if (!confirm(`Verifikasi iuran ${residentName} untuk bulan ${monthYear} (Rp 80.000)?`)) return;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            appData = res.data;
+            renderDashboard();
+            showToast(`Iuran ${residentName} lunas!`);
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction({ action: 'verifyAuth' && 'markDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear, amount: 80000 } });
+    }
+
+    function copyWaReminder() {
+      const month = document.getElementById('monthFilter').value;
+      const unpaid = appData.residents
+        .filter(r => r.status === 'Aktif')
+        .filter(r => !appData.dues.find(d => d.residentId === r.id && d.month === month && d.status === 'Lunas'));
+      const text = `*REKAP IURAN MES FORTRESS (${month})*\nBelum bayar (${unpaid.length} orang):\n` +
+        unpaid.map((r, i) => `${i + 1}. ${r.name} (Rp 80.000)`).join('\n') +
+        `\n\nMohon segera dilunasi sebelum tgl 30 ya. Terima kasih!`;
+      navigator.clipboard.writeText(text).then(() => showToast('Rekap WA disalin ke clipboard!'));
+    }
+
+    function exportCsv() {
+      const rows = [['ID', 'Tanggal', 'Tipe', 'Kategori', 'Keterangan', 'Qty', 'Nominal']];
+      appData.transactions.forEach(t => rows.push([t.id, t.date, t.type, t.category, `"${t.description}"`, t.qty, t.nominal]));
+      const csv = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `kas-fortmess-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
