@@ -38,6 +38,15 @@
     <!-- Toast Notification -->
     <div id="toast" class="hidden fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition"></div>
 
+    <!-- Global CRUD Loading Pill (Anti-Double-Click Indicator) -->
+    <div id="crudLoader" class="hidden fixed top-4 right-4 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-stone-900 text-white text-xs font-semibold shadow-xl border border-stone-700">
+      <svg class="animate-spin h-4 w-4 text-emerald-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+      </svg>
+      <span id="crudLoaderText">Menyimpan ke Google Sheets...</span>
+    </div>
+
     <!-- Status Banner -->
     <div id="loadingState" class="bg-amber-50 px-4 py-3 rounded-2xl border border-amber-200 text-amber-900 text-xs flex items-center justify-between">
       <span id="loadingText">⏳ Menyinkronkan data dari Google Sheets...</span>
@@ -246,6 +255,40 @@
     let appData = null;
     let adminPin = null;
     let editingTrxId = null;
+    let isCrudBusy = false;
+
+    function setCrudBusy(busy, label = 'Menyimpan ke Google Sheets...') {
+      isCrudBusy = busy;
+      const loader = document.getElementById('crudLoader');
+      const text = document.getElementById('crudLoaderText');
+      const main = document.getElementById('mainContent');
+      if (busy) {
+        text.textContent = label;
+        loader.classList.remove('hidden');
+        main.classList.add('pointer-events-none', 'opacity-75');
+      } else {
+        loader.classList.add('hidden');
+        main.classList.remove('pointer-events-none', 'opacity-75');
+      }
+    }
+
+    function runCrud(label, payload, onSuccess, onError) {
+      if (isCrudBusy) return;
+      setCrudBusy(true, label);
+      runServer(
+        'handleAction',
+        payload,
+        (res) => {
+          setCrudBusy(false);
+          onSuccess(res);
+        },
+        (err) => {
+          setCrudBusy(false);
+          if (onError) onError(err);
+          else showToast('Gagal: ' + (err.message || err), true);
+        }
+      );
+    }
 
     function getExecUrl() {
       return window.__EXEC_URL__ || localStorage.getItem('FORTMESS_EXEC_URL') || DEFAULT_EXEC_URL;
@@ -373,6 +416,24 @@
       );
     }
 
+    function saveCache(data) {
+      if (!data || data.error) return;
+      try { localStorage.setItem('FORTMESS_CACHE_V1', JSON.stringify(data)); } catch (e) {}
+    }
+
+    function recalcSummary() {
+      if (!appData) return;
+      let inc = 0, exp = 0;
+      (appData.transactions || []).forEach(t => {
+        if (t.type === 'Pemasukan') inc += Number(t.nominal || 0);
+        else exp += Number(t.nominal || 0);
+      });
+      appData.summary.totalIncome = inc;
+      appData.summary.totalExpense = exp;
+      appData.summary.balance = inc - exp;
+      saveCache(appData);
+    }
+
     function init() {
       const todayIso = new Date().toISOString().slice(0, 10);
       document.getElementById('monthFilter').value = todayIso.slice(0, 7);
@@ -380,33 +441,42 @@
       setTrxType('Pengeluaran');
       if (window.__INITIAL_DATA__) {
         appData = window.__INITIAL_DATA__;
-        if (appData.error) {
-          document.getElementById('loadingText').textContent = '⚠️ ' + appData.error;
-        } else {
-          document.getElementById('loadingState').classList.add('hidden');
-        }
+        saveCache(appData);
+        document.getElementById('loadingState').classList.add('hidden');
         renderDashboard();
       } else {
-        loadData();
+        try {
+          const cached = localStorage.getItem('FORTMESS_CACHE_V1');
+          if (cached) {
+            appData = JSON.parse(cached);
+            document.getElementById('loadingState').classList.add('hidden');
+            renderDashboard();
+          }
+        } catch (e) {}
+        loadData(Boolean(appData));
       }
     }
 
-    function loadData() {
+    function loadData(silent = false) {
       const banner = document.getElementById('loadingState');
       const text = document.getElementById('loadingText');
-      banner.classList.remove('hidden');
-      text.textContent = '⏳ Menyinkronkan data dari Google Sheets...';
+      if (!silent) {
+        banner.classList.remove('hidden');
+        text.textContent = '⏳ Menyinkronkan data dari Google Sheets...';
+      }
 
       runServer(
         'getDashboardData',
         null,
         (res) => {
           if (!res) {
-            text.textContent = '⚠️ Respons kosong dari server. Klik Muat Ulang.';
+            if (!silent) text.textContent = '⚠️ Respons kosong dari server. Klik Muat Ulang.';
             return;
           }
           appData = res;
+          saveCache(appData);
           if (res.error) {
+            banner.classList.remove('hidden');
             text.textContent = '⚠️ ' + res.error;
           } else {
             banner.classList.add('hidden');
@@ -414,8 +484,10 @@
           renderDashboard();
         },
         (err) => {
-          text.textContent = '⚠️ Gagal memuat: ' + (err.message || err);
-          showToast('Gagal memuat data: ' + (err.message || err), true);
+          if (!silent) {
+            text.textContent = '⚠️ Gagal memuat: ' + (err.message || err);
+            showToast('Gagal memuat data: ' + (err.message || err), true);
+          }
         }
       );
     }
@@ -588,12 +660,14 @@
     }
 
     function saveCategoriesInline() {
+      if (isCrudBusy) return;
       const input = document.getElementById('inputCategories').value;
       const categories = input.split(',').map(s => s.trim()).filter(Boolean);
       if (categories.length === 0) return showToast('Minimal 1 kategori', true);
-      runServer('handleAction', { action: 'saveCategories', pin: adminPin, data: { categories } }, (res) => {
+      runCrud('Menyimpan kategori...', { action: 'saveCategories', pin: adminPin, data: { categories } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           document.getElementById('categoryEditorBox').classList.add('hidden');
           renderDashboard();
           showToast('Kategori diperbarui');
@@ -623,14 +697,16 @@
 
     function submitResident(e) {
       e.preventDefault();
+      if (isCrudBusy) return;
       const id = document.getElementById('editResId').value;
       const name = document.getElementById('resName').value.trim();
       const note = document.getElementById('resNote').value.trim();
       if (!name) return;
       const isEdit = Boolean(id);
-      runServer('handleAction', { action: isEdit ? 'updateResident' : 'addResident', pin: adminPin, data: { id, name, note } }, (res) => {
+      runCrud(isEdit ? 'Memperbarui penghuni...' : 'Menambah penghuni...', { action: isEdit ? 'updateResident' : 'addResident', pin: adminPin, data: { id, name, note } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           cancelEditResident();
           renderDashboard();
           showToast(isEdit ? `Data ${name} diperbarui` : `Penghuni ${name} ditambahkan`);
@@ -641,36 +717,44 @@
     }
 
     function toggleResident(id) {
-      runServer('handleAction', { action: 'toggleResident', pin: adminPin, data: { id } }, (res) => {
+      if (isCrudBusy) return;
+      runCrud('Mengubah status penghuni...', { action: 'toggleResident', pin: adminPin, data: { id } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           renderDashboard();
           showToast('Status penghuni diperbarui');
         } else {
+          loadData(true);
           showToast(res ? res.error : 'Gagal', true);
         }
       });
     }
 
     function deleteResident(id, name) {
-      runServer('handleAction', { action: 'deleteResident', pin: adminPin, data: { id } }, (res) => {
+      if (isCrudBusy) return;
+      runCrud(`Menghapus ${name}...`, { action: 'deleteResident', pin: adminPin, data: { id } }, (res) => {
         if (res && res.ok) {
           if (document.getElementById('editResId').value === id) cancelEditResident();
           appData = res.data;
+          saveCache(appData);
           renderDashboard();
           showToast(`Penghuni ${name} dihapus`);
         } else {
+          loadData(true);
           showToast(res ? res.error : 'Gagal', true);
         }
       });
     }
 
     function generatePiket() {
+      if (isCrudBusy) return;
       const count = document.getElementById('piketCount').value || 2;
       const dayName = document.getElementById('piketDayInput').value.trim() || 'Minggu';
-      runServer('handleAction', { action: 'generateWeeklyPiket', pin: adminPin, data: { count, dayName } }, (res) => {
+      runCrud('Mengacak jadwal piket...', { action: 'generateWeeklyPiket', pin: adminPin, data: { count, dayName } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           renderDashboard();
           showToast('Petugas piket berhasil diacak!');
         } else {
@@ -680,10 +764,12 @@
     }
 
     function changePiketDay() {
+      if (isCrudBusy) return;
       const dayName = document.getElementById('piketDayInput').value.trim() || 'Minggu';
-      runServer('handleAction', { action: 'updatePiketDay', pin: adminPin, data: { dayName } }, (res) => {
+      runCrud('Mengubah hari piket...', { action: 'updatePiketDay', pin: adminPin, data: { dayName } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           renderDashboard();
           showToast(`Hari piket diganti ke ${dayName}`);
         } else {
@@ -693,9 +779,11 @@
     }
 
     function markPiketDone() {
-      runServer('handleAction', { action: 'markPiketDone', pin: adminPin, data: {} }, (res) => {
+      if (isCrudBusy) return;
+      runCrud('Menandai piket selesai...', { action: 'markPiketDone', pin: adminPin, data: {} }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           renderDashboard();
           showToast('Piket minggu ini ditandai Selesai!');
         } else {
@@ -709,12 +797,14 @@
     }
 
     function swapPiket() {
+      if (isCrudBusy) return;
       const oldName = document.getElementById('swapOldName').value.trim();
       const newName = document.getElementById('swapNewName').value.trim();
       if (!oldName || !newName) return showToast('Isi nama yang diganti & penggantinya', true);
-      runServer('handleAction', { action: 'swapPiketMember', pin: adminPin, data: { oldName, newName } }, (res) => {
+      runCrud('Menukar petugas piket...', { action: 'swapPiketMember', pin: adminPin, data: { oldName, newName } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           document.getElementById('swapOldName').value = '';
           document.getElementById('swapNewName').value = '';
           document.getElementById('piketSwapBox').classList.add('hidden');
@@ -762,24 +852,29 @@
     }
 
     function deleteTrx(id) {
-      runServer('handleAction', { action: 'deleteTransaction', pin: adminPin, data: { id } }, (res) => {
+      if (isCrudBusy) return;
+      runCrud('Menghapus transaksi...', { action: 'deleteTransaction', pin: adminPin, data: { id } }, (res) => {
         if (res && res.ok) {
           if (editingTrxId === id) cancelEditTrx();
           appData = res.data;
+          saveCache(appData);
           renderDashboard();
           showToast('Transaksi dihapus');
         } else {
-          showToast(res ? res.error : 'Gagal', true);
+          loadData(true);
+          showToast(res ? res.error : 'Gagal menghapus di server', true);
         }
       });
     }
 
     async function submitTransaction(e) {
       e.preventDefault();
+      if (isCrudBusy) return;
       const btn = document.getElementById('btnSubmitTrx');
       const defaultLabel = editingTrxId ? 'Simpan Perubahan' : 'Tambah';
       btn.disabled = true;
-      btn.textContent = 'Menyimpan...';
+      setCrudBusy(true, 'Menyimpan transaksi...');
+      btn.textContent = '⏳ Menyimpan...';
       try {
         const fileInput = document.getElementById('trxProof');
         const file = fileInput.files[0];
@@ -787,37 +882,44 @@
         if (file) {
           if (file.size > 15 * 1024 * 1024) {
             btn.disabled = false;
+            setCrudBusy(false);
             btn.textContent = defaultLabel;
             return showToast('Ukuran foto mentah maksimal 15 MB', true);
           }
-          btn.textContent = 'Mengompres foto...';
+          setCrudBusy(true, 'Mengompres foto...');
+          btn.textContent = '⏳ Mengompres foto...';
           proof = await compressImage(file);
-          btn.textContent = 'Menyimpan...';
+          setCrudBusy(true, 'Mengunggah transaksi & foto...');
+          btn.textContent = '⏳ Mengunggah...';
         }
 
         const isEdit = Boolean(editingTrxId);
+        const trxData = {
+          id: editingTrxId,
+          date: document.getElementById('trxDate').value,
+          type: document.getElementById('trxType').value,
+          category: document.getElementById('trxCategory').value,
+          description: document.getElementById('trxDesc').value,
+          qty: document.getElementById('trxQty').value ? Number(document.getElementById('trxQty').value) : null,
+          nominal: Number(document.getElementById('trxNominal').value.replace(/\D/g, '')),
+          proof,
+          removeProof: isEdit ? document.getElementById('trxRemoveProof').checked : false,
+        };
+
         const payload = {
           action: isEdit ? 'updateTransaction' : 'addTransaction',
           pin: adminPin,
-          data: {
-            id: editingTrxId,
-            date: document.getElementById('trxDate').value,
-            type: document.getElementById('trxType').value,
-            category: document.getElementById('trxCategory').value,
-            description: document.getElementById('trxDesc').value,
-            qty: document.getElementById('trxQty').value,
-            nominal: document.getElementById('trxNominal').value.replace(/\D/g, ''),
-            proof,
-            removeProof: isEdit ? document.getElementById('trxRemoveProof').checked : false,
-          },
+          data: trxData,
         };
         runServer(
           'handleAction',
           payload,
           (res) => {
             btn.disabled = false;
+            setCrudBusy(false);
             if (res && res.ok) {
               appData = res.data;
+              saveCache(appData);
               cancelEditTrx();
               renderDashboard();
               showToast(isEdit ? 'Transaksi diperbarui' : 'Transaksi ditambahkan');
@@ -828,23 +930,27 @@
           },
           (err) => {
             btn.disabled = false;
+            setCrudBusy(false);
             btn.textContent = defaultLabel;
             showToast('Gagal: ' + (err.message || err), true);
           }
         );
       } catch (err) {
         btn.disabled = false;
+        setCrudBusy(false);
         btn.textContent = defaultLabel;
         showToast('Error: ' + err.message, true);
       }
     }
 
     function linkSpreadsheet() {
+      if (isCrudBusy) return;
       const spreadsheetUrl = document.getElementById('inputSheetUrl').value.trim();
       if (!spreadsheetUrl) return showToast('Masukkan link Google Sheet terlebih dahulu', true);
-      runServer('handleAction', { action: 'linkSpreadsheet', pin: adminPin, data: { spreadsheetUrl } }, (res) => {
+      runCrud('Menghubungkan Google Sheet...', { action: 'linkSpreadsheet', pin: adminPin, data: { spreadsheetUrl } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           document.getElementById('inputSheetUrl').value = '';
           renderDashboard();
           showToast('Google Sheet berhasil dihubungkan & 5 tab dibuat!');
@@ -861,10 +967,12 @@
     }
 
     function updatePaymentInfo() {
+      if (isCrudBusy) return;
       const paymentInfo = document.getElementById('inputPaymentInfo').value;
-      runServer('handleAction', { action: 'updatePaymentInfo', pin: adminPin, data: { paymentInfo } }, (res) => {
+      runCrud('Menyimpan rekening...', { action: 'updatePaymentInfo', pin: adminPin, data: { paymentInfo } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           renderDashboard();
           showToast('Info rekening berhasil disimpan');
         } else {
@@ -874,10 +982,12 @@
     }
 
     function updateDuesAmount() {
+      if (isCrudBusy) return;
       const amount = document.getElementById('inputDuesAmount').value;
-      runServer('handleAction', { action: 'updateDuesAmount', pin: adminPin, data: { amount } }, (res) => {
+      runCrud('Menyimpan tarif iuran...', { action: 'updateDuesAmount', pin: adminPin, data: { amount } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           renderDashboard();
           showToast('Tarif iuran berhasil diperbarui');
         } else {
@@ -887,27 +997,33 @@
     }
 
     function markPaid(residentId, residentName) {
+      if (isCrudBusy) return;
       const monthYear = document.getElementById('monthFilter').value;
-      const amount = appData?.summary?.duesAmount || 80000;
-      runServer('handleAction', { action: 'markDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear, amount } }, (res) => {
+      const amount = Number(appData?.summary?.duesAmount || 80000);
+      runCrud(`Memverifikasi iuran ${residentName}...`, { action: 'markDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear, amount } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           renderDashboard();
           showToast(`Iuran ${residentName} lunas!`);
         } else {
+          loadData(true);
           showToast(res ? res.error : 'Gagal', true);
         }
       });
     }
 
     function unmarkPaid(residentId, residentName) {
+      if (isCrudBusy) return;
       const monthYear = document.getElementById('monthFilter').value;
-      runServer('handleAction', { action: 'unmarkDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear } }, (res) => {
+      runCrud(`Membatalkan lunas ${residentName}...`, { action: 'unmarkDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          saveCache(appData);
           renderDashboard();
           showToast(`Status lunas ${residentName} dibatalkan`);
         } else {
+          loadData(true);
           showToast(res ? res.error : 'Gagal', true);
         }
       });

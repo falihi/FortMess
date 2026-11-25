@@ -282,6 +282,14 @@ function handleAction(payload) {
       return { ok: true, message: 'Akses Bendahara aktif.' };
     }
 
+    // Server-side anti-double-input (idempotency guard 4 detik untuk payload identik)
+    const dedupHash = hashPin_(action + ':' + JSON.stringify(data || {}));
+    const dedupKey = 'DEDUP_' + dedupHash.slice(0, 24);
+    if (cache.get(dedupKey)) {
+      return { ok: false, error: 'Permintaan ganda ditolak (sedang diproses).' };
+    }
+    cache.put(dedupKey, '1', 4);
+
     if (action === 'linkSpreadsheet') {
       const rawUrl = String(data.spreadsheetUrl || '').trim();
       if (!rawUrl) return { ok: false, error: 'Link / ID Google Sheet wajib diisi.' };
@@ -295,7 +303,9 @@ function handleAction(payload) {
     }
 
     const ss = getSpreadsheet_();
-    ensureSheets_(ss);
+    if (!ss.getSheetByName(SHEET_NAMES.LEDGER)) {
+      ensureSheets_(ss);
+    }
 
     if (action === 'updateDuesAmount') {
       const newAmount = Number(data.amount);
