@@ -265,30 +265,33 @@
         else showToast('Error: ' + (err.message || err), true);
       };
 
-      const fetchFallback = () => {
-        const url = getExecUrl();
-        const opts = methodName === 'getDashboardData'
-          ? { method: 'GET', redirect: 'follow' }
-          : { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) };
-        const target = methodName === 'getDashboardData' ? (url + '?action=data&t=' + Date.now()) : url;
-        fetch(target, opts)
-          .then(r => r.json())
-          .then(done)
-          .catch(fail);
-      };
+      const url = getExecUrl();
+      const isGet = methodName === 'getDashboardData';
+      const target = isGet ? (url + '?action=data&t=' + Date.now()) : url;
+      const opts = isGet
+        ? { method: 'GET', redirect: 'follow', credentials: 'omit' }
+        : {
+            method: 'POST',
+            redirect: 'follow',
+            credentials: 'omit',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload),
+          };
 
-      if (typeof google !== 'undefined' && google.script && google.script.run) {
-        const timer = setTimeout(() => {
-          if (!settled) fetchFallback();
-        }, 4500);
-        const runner = google.script.run
-          .withSuccessHandler((res) => { clearTimeout(timer); done(res); })
-          .withFailureHandler((err) => { clearTimeout(timer); fail(err); });
-        if (methodName === 'getDashboardData') runner.getDashboardData();
-        else runner.handleAction(payload);
-      } else {
-        fetchFallback();
-      }
+      fetch(target, opts)
+        .then(r => r.json())
+        .then(done)
+        .catch((fetchErr) => {
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            const runner = google.script.run
+              .withSuccessHandler(done)
+              .withFailureHandler(fail);
+            if (isGet) runner.getDashboardData();
+            else runner.handleAction(payload);
+          } else {
+            fail(fetchErr);
+          }
+        });
     }
 
     const fmtRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
