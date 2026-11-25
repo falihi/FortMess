@@ -113,7 +113,10 @@ function hashPin_(pin) {
 }
 
 function verifyAdmin_(pin) {
-  const savedHash = PropertiesService.getScriptProperties().getProperty('ADMIN_PIN_HASH');
+  const props = PropertiesService.getScriptProperties();
+  const plainProp = props.getProperty('initPin') || props.getProperty('ADMIN_PIN');
+  if (plainProp && String(pin || '') === plainProp) return true;
+  const savedHash = props.getProperty('ADMIN_PIN_HASH');
   if (!savedHash) return false;
   return hashPin_(String(pin || '')) === savedHash;
 }
