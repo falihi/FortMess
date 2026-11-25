@@ -560,6 +560,43 @@ function handleAction(payload) {
       return { ok: true, data: getDashboardData() };
     }
 
+    if (action === 'saveMonthlyPiket') {
+      const piketSheet = ss.getSheetByName(SHEET_NAMES.PIKET);
+      const schedules = Array.isArray(data.schedules) ? data.schedules : [];
+      if (schedules.length === 0) return { ok: false, error: 'Jadwal piket kosong.' };
+
+      if (piketSheet.getLastRow() >= 2) {
+        piketSheet.deleteRows(2, piketSheet.getLastRow() - 1);
+      }
+      const rowsToInsert = schedules.map(s => [
+        String(s.week || ''),
+        String(s.day || 'Minggu'),
+        String(s.assignees || '-'),
+        String(s.status || 'Terjadwal'),
+        String(s.note || ''),
+      ]);
+      piketSheet.getRange(2, 1, rowsToInsert.length, 5).setValues(rowsToInsert);
+      logAudit(actor, 'SAVE_MONTHLY_PIKET', `Jadwal piket ${schedules.length} minggu disimpan`);
+      return { ok: true, data: getDashboardData() };
+    }
+
+    if (action === 'updateWeekPiket') {
+      const piketSheet = ss.getSheetByName(SHEET_NAMES.PIKET);
+      const rows = piketSheet.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]) === String(data.week)) {
+          const newDay = data.day != null ? String(data.day) : String(rows[i][1]);
+          const newAssignees = data.assignees != null ? String(data.assignees) : String(rows[i][2]);
+          const newStatus = data.status != null ? String(data.status) : String(rows[i][3]);
+          const newNote = data.note != null ? String(data.note) : String(rows[i][4] || '');
+          piketSheet.getRange(i + 1, 2, 1, 4).setValues([[newDay, newAssignees, newStatus, newNote]]);
+          logAudit(actor, 'UPDATE_WEEK_PIKET', `${data.week}: ${newDay} | ${newAssignees} | ${newStatus}`);
+          return { ok: true, data: getDashboardData() };
+        }
+      }
+      return { ok: false, error: 'Minggu piket tidak ditemukan di sheet. Klik "Acak Jadwal 1 Bulan" terlebih dahulu.' };
+    }
+
     if (action === 'generateWeeklyPiket') {
       const resRows = ss.getSheetByName(SHEET_NAMES.RESIDENTS).getDataRange().getValues().slice(1);
       const activeNames = resRows.filter(r => r[2] === 'Aktif').map(r => r[1]);

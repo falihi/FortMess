@@ -284,39 +284,45 @@
       <!-- ==================== TAB 3: JADWAL PIKET & PENGATURAN ==================== -->
       <div id="tabSectionPiket" class="hidden space-y-4">
         <section class="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-sm space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 class="text-base font-extrabold text-stone-900">🧹 Jadwal Piket Bersih-Bersih Mingguan</h2>
-              <p class="text-xs text-stone-500">Giliran piket diacak adil (yang sudah piket minggu lalu tidak kena 2x berturut-turut)</p>
+              <h2 class="text-base font-extrabold text-stone-900">🧹 Jadwal Piket Bersih-Bersih Bulanan (Minggu 1 – Akhir)</h2>
+              <p class="text-xs text-stone-500">Otomatis menghitung jumlah minggu di bulan tersebut & membagi rata seluruh penghuni aktif</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-semibold text-stone-500">Bulan Piket:</label>
+              <input id="piketMonthFilter" type="month" onchange="renderDashboard()" class="text-sm font-bold px-3 py-1.5 rounded-xl border border-stone-300 bg-stone-50" />
             </div>
           </div>
 
-          <div id="piketList" class="text-sm"></div>
+          <!-- Ringkasan Analisis Minggu & Penghuni -->
+          <div id="piketSummaryBanner" class="p-3.5 rounded-2xl bg-stone-50 border border-stone-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span id="piketStatsText" class="font-bold text-stone-800">Menghitung minggu & penghuni...</span>
+            <span class="text-stone-500">💡 Tiap minggu bisa digeser ke <strong>Jumat Malam</strong> atau tukar orang jika berhalangan</span>
+          </div>
 
-          <!-- Kontrol Piket (Khusus Bendahara) -->
-          <div id="piketAdminBtns" class="hidden p-4 rounded-2xl bg-stone-50 border border-stone-200 space-y-3">
-            <p class="text-xs font-bold text-stone-700">⚙️ Atur Jadwal Piket Minggu Ini (Bendahara):</p>
-            <div class="flex flex-wrap items-center gap-2">
-              <div class="flex items-center gap-1.5">
-                <label class="text-xs text-stone-500">Jumlah Orang:</label>
-                <input id="piketCount" type="number" min="1" max="10" value="2" class="w-14 px-2.5 py-1.5 text-xs font-bold rounded-lg border border-stone-300 bg-white" />
+          <!-- Kontrol Generate 1 Bulan Penuh (Khusus Bendahara) -->
+          <div id="piketAdminBtns" class="hidden p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-xs font-bold text-stone-800">⚙️ Buat / Acak Ulang Jadwal Piket 1 Bulan Penuh (Minggu 1 s/d Minggu Akhir):</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-1.5">
+                  <label class="text-xs font-semibold text-stone-600">Orang / Minggu:</label>
+                  <input id="piketCount" type="number" min="1" max="10" value="2" class="w-14 px-2.5 py-1.5 text-xs font-bold rounded-lg border border-stone-300 bg-white" />
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <label class="text-xs font-semibold text-stone-600">Hari Default:</label>
+                  <input id="piketDayInput" type="text" value="Minggu" placeholder="Minggu / Jumat Malam" class="w-28 px-2.5 py-1.5 text-xs font-bold rounded-lg border border-stone-300 bg-white" />
+                </div>
+                <button type="button" onclick="generateMonthlyPiketUI()" class="text-xs px-4 py-2 rounded-xl bg-stone-900 text-white font-bold hover:bg-stone-800 shadow-sm">
+                  🎲 Acak & Bagi Rata 1 Bulan
+                </button>
               </div>
-              <div class="flex items-center gap-1.5">
-                <label class="text-xs text-stone-500">Hari Piket:</label>
-                <input id="piketDayInput" type="text" value="Minggu" placeholder="Minggu / Jumat Malam" class="w-32 px-2.5 py-1.5 text-xs font-bold rounded-lg border border-stone-300 bg-white" />
-              </div>
-              <button type="button" onclick="generatePiket()" class="text-xs px-3.5 py-2 rounded-lg bg-stone-900 text-white font-bold hover:bg-stone-800">🎲 Acak Giliran Baru</button>
-              <button type="button" onclick="changePiketDay()" class="text-xs px-3 py-2 rounded-lg border border-stone-300 bg-white font-semibold hover:bg-stone-100">📅 Ganti Hari Saja</button>
-              <button type="button" onclick="toggleSwapBox()" class="text-xs px-3 py-2 rounded-lg border border-stone-300 bg-white font-semibold hover:bg-stone-100">🔄 Tukar Orang</button>
-              <button type="button" onclick="markPiketDone()" class="text-xs px-3.5 py-2 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700">✅ Tandai Sudah Selesai</button>
-            </div>
-
-            <div id="piketSwapBox" class="hidden flex flex-wrap items-center gap-2 pt-2 border-t border-stone-200">
-              <input id="swapOldName" type="text" placeholder="Nama yang berhalangan..." class="flex-1 min-w-[140px] px-3 py-1.5 text-xs rounded-lg border border-stone-300 bg-white" />
-              <input id="swapNewName" type="text" placeholder="Digantikan oleh siapa..." class="flex-1 min-w-[140px] px-3 py-1.5 text-xs rounded-lg border border-stone-300 bg-white" />
-              <button type="button" onclick="swapPiket()" class="px-3.5 py-1.5 text-xs font-bold rounded-lg bg-stone-900 text-white">Simpan Pertukaran</button>
             </div>
           </div>
+
+          <!-- Daftar Minggu 1 s/d Minggu Akhir -->
+          <div id="piketList" class="space-y-3 text-sm"></div>
         </section>
 
         <!-- Pengaturan Bendahara (Tarif, Rekening, Koneksi Sheet) -->
@@ -566,6 +572,7 @@
     function init() {
       const todayIso = new Date().toISOString().slice(0, 10);
       document.getElementById('monthFilter').value = todayIso.slice(0, 7);
+      document.getElementById('piketMonthFilter').value = todayIso.slice(0, 7);
       document.getElementById('trxDate').value = todayIso;
       setTrxType('Pengeluaran');
       if (window.__INITIAL_DATA__) {
@@ -775,23 +782,74 @@
       }).join('');
       document.getElementById('residentsList').innerHTML = resHtml || '<p class="py-6 text-center text-stone-400 text-xs">Belum ada daftar penghuni aktif.</p>';
 
-      const piket = (appData.piket || [])[0];
-      if (piket) {
-        document.getElementById('piketDayInput').value = piket.day || 'Minggu';
-        document.getElementById('piketList').innerHTML = `
-          <div class="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div class="space-y-1">
-              <p class="text-xs font-bold uppercase tracking-wider text-emerald-800">🗓️ Jadwal Piket: Hari ${escHtml(piket.day)}</p>
-              <p class="text-lg font-extrabold text-stone-900">Petugas: ${escHtml(piket.assignees)}</p>
-              ${piket.note ? `<p class="text-xs text-stone-600">Catatan: ${escHtml(piket.note)}</p>` : ''}
+      // ==================== RENDER JADWAL PIKET BULANAN (MINGGU 1 - AKHIR) ====================
+      const piketMonth = document.getElementById('piketMonthFilter').value || selectedMonth;
+      const monthWeeks = getWeeksInMonth(piketMonth);
+      const activeNames = activeResidentsList.map(r => r.name);
+      const idealPerWeek = activeNames.length > 0 ? Math.max(Math.ceil(activeNames.length / monthWeeks.length), 1) : 2;
+      document.getElementById('piketStatsText').textContent =
+        `📊 ${fmtMonthIndo(piketMonth)}: Ada ${monthWeeks.length} Minggu (${monthWeeks[0]?.shortDate || ''} – ${monthWeeks[monthWeeks.length - 1]?.shortDate || ''}) • ${activeNames.length} Penghuni Aktif • Ideal: ${idealPerWeek} Orang/Minggu`;
+
+      const schedules = buildOrLoadMonthlyPiket(piketMonth, monthWeeks, activeNames, idealPerWeek);
+      const todayIso = new Date().toISOString().slice(0, 10);
+
+      const piketCardsHtml = schedules.map((item, idx) => {
+        const isCurrentWeek = item.isCurrentWeek;
+        const isDone = item.status === 'Selesai';
+        return `
+          <div class="p-4 rounded-2xl border transition ${isCurrentWeek ? 'bg-emerald-50/70 border-emerald-300 shadow-sm' : 'bg-white border-stone-200/90'} space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-1 rounded-lg text-xs font-extrabold ${isCurrentWeek ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-700'}">
+                  ${escHtml(item.weekLabel)}
+                </span>
+                <span class="text-xs font-bold text-stone-600">🗓️ Hari ${escHtml(item.day)} (${escHtml(item.dateRange)})</span>
+                ${isCurrentWeek ? '<span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">📍 Minggu Ini</span>' : ''}
+              </div>
+              <span class="text-xs px-3 py-1 rounded-full ${isDone ? 'bg-emerald-600 text-white' : 'bg-amber-100 text-amber-800 border border-amber-200'} font-bold">
+                ${isDone ? '✅ Sudah Selesai' : '⏳ Terjadwal'}
+              </span>
             </div>
-            <span class="text-xs px-3.5 py-1.5 rounded-full ${piket.status === 'Selesai' ? 'bg-emerald-600' : 'bg-amber-600'} text-white font-bold self-start sm:self-center">
-              ${piket.status === 'Selesai' ? '✅ Sudah Selesai' : '⏳ Terjadwal'}
-            </span>
+
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p class="text-base font-extrabold text-stone-900">Petugas: ${escHtml(item.assignees)}</p>
+                ${item.note ? `<p class="text-xs text-stone-500 mt-0.5">Catatan: ${escHtml(item.note)}</p>` : ''}
+              </div>
+
+              ${adminPin ? `
+              <div class="flex flex-wrap items-center gap-1.5">
+                <button type="button" onclick="toggleWeekDayBox(${idx})" class="text-xs px-2.5 py-1.5 rounded-lg border border-stone-200 bg-white font-semibold hover:bg-stone-50">📅 Ganti Hari</button>
+                <button type="button" onclick="toggleWeekSwapBox(${idx})" class="text-xs px-2.5 py-1.5 rounded-lg border border-stone-200 bg-white font-semibold hover:bg-stone-50">🔄 Tukar Orang</button>
+                <button type="button" onclick="toggleWeekStatus(${idx})" class="text-xs px-3 py-1.5 rounded-lg ${isDone ? 'border border-stone-300 bg-white text-stone-700' : 'bg-emerald-600 text-white'} font-bold hover:opacity-90">
+                  ${isDone ? '↩️ Batal Selesai' : '✅ Selesai'}
+                </button>
+              </div>` : ''}
+            </div>
+
+            <!-- Inline Ganti Hari per Minggu -->
+            <div id="weekDayBox_${idx}" class="hidden flex flex-wrap items-center gap-2 pt-2 border-t border-stone-200/80">
+              <span class="text-xs text-stone-500">Ubah hari untuk ${escHtml(item.weekLabel)}:</span>
+              <input id="weekDayInput_${idx}" type="text" value="${escHtml(item.day)}" placeholder="Contoh: Jumat Malam" class="px-2.5 py-1 text-xs rounded-lg border border-stone-300 bg-white" />
+              <button type="button" onclick="saveWeekDay(${idx})" class="px-3 py-1 text-xs font-bold rounded-lg bg-stone-900 text-white">Simpan Hari</button>
+            </div>
+
+            <!-- Inline Tukar Orang per Minggu -->
+            <div id="weekSwapBox_${idx}" class="hidden flex flex-wrap items-center gap-2 pt-2 border-t border-stone-200/80">
+              <span class="text-xs text-stone-500">Tukar di ${escHtml(item.weekLabel)}:</span>
+              <select id="weekSwapOld_${idx}" class="px-2.5 py-1 text-xs rounded-lg border border-stone-300 bg-white">
+                ${item.assignees.split(',').map(s => s.trim()).filter(Boolean).map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('')}
+              </select>
+              <span class="text-xs text-stone-400">diganti</span>
+              <select id="weekSwapNew_${idx}" class="px-2.5 py-1 text-xs rounded-lg border border-stone-300 bg-white">
+                ${activeNames.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('')}
+              </select>
+              <button type="button" onclick="saveWeekSwap(${idx})" class="px-3 py-1 text-xs font-bold rounded-lg bg-stone-900 text-white">Simpan Tukar</button>
+            </div>
           </div>`;
-      } else {
-        document.getElementById('piketList').innerHTML = '<p class="py-4 text-center text-stone-400 text-xs">Jadwal piket mingguan belum diatur.</p>';
-      }
+      }).join('');
+
+      document.getElementById('piketList').innerHTML = piketCardsHtml || '<p class="py-4 text-center text-stone-400 text-xs">Tidak ada penghuni aktif untuk dijadwalkan.</p>';
     }
 
     function compressImage(file, maxDim = 1280, quality = 0.72) {
@@ -931,73 +989,235 @@
       });
     }
 
-    function generatePiket() {
-      if (isCrudBusy) return;
-      const count = document.getElementById('piketCount').value || 2;
-      const dayName = document.getElementById('piketDayInput').value.trim() || 'Minggu';
-      runCrud('Mengacak jadwal piket...', { action: 'generateWeeklyPiket', pin: adminPin, data: { count, dayName } }, (res) => {
-        if (res && res.ok) {
+    // ==================== LOGIKA JADWAL PIKET BULANAN (MINGGU 1 S/D MINGGU AKHIR) ====================
+    let currentMonthlySchedules = [];
+
+    function getWeeksInMonth(ym) {
+      const m = String(ym || '').match(/^(\d{4})-(\d{2})$/);
+      const year = m ? Number(m[1]) : new Date().getFullYear();
+      const monthIdx = m ? Number(m[2]) - 1 : new Date().getMonth();
+      const monthShort = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'][monthIdx] || '';
+      const lastDay = new Date(year, monthIdx + 1, 0).getDate();
+
+      // Cari setiap hari Minggu di bulan tersebut (masing-masing mewakili Minggu 1 s/d Minggu akhir)
+      const sundays = [];
+      for (let d = 1; d <= lastDay; d++) {
+        const dt = new Date(year, monthIdx, d);
+        if (dt.getDay() === 0) {
+          sundays.push(d);
+        }
+      }
+
+      const today = new Date();
+      const isSameMonth = today.getFullYear() === year && today.getMonth() === monthIdx;
+      const todayDate = today.getDate();
+
+      return sundays.map((sunDate, i) => {
+        const prevSun = i === 0 ? 1 : sundays[i - 1] + 1;
+        const isCurrentWeek = isSameMonth && todayDate >= prevSun && todayDate <= sunDate;
+        const padSun = String(sunDate).padStart(2, '0');
+        return {
+          weekNum: i + 1,
+          weekKey: `${ym}-W${i + 1}`,
+          weekLabel: `Minggu ${i + 1}`,
+          sundayDate: sunDate,
+          shortDate: `${padSun} ${monthShort}`,
+          dateRange: `${padSun} ${monthShort} ${year}`,
+          isCurrentWeek,
+        };
+      });
+    }
+
+    function buildOrLoadMonthlyPiket(ym, monthWeeks, activeNames, defaultCount) {
+      const storageKey = 'FORTMESS_PIKET_' + ym;
+      const sheetRows = (appData?.piket || []).filter(p => String(p.week || '').startsWith('Minggu '));
+
+      let saved = null;
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) saved = JSON.parse(raw);
+      } catch (e) {}
+
+      if (sheetRows.length === monthWeeks.length) {
+        currentMonthlySchedules = monthWeeks.map((w, idx) => ({
+          ...w,
+          week: sheetRows[idx].week || w.weekLabel,
+          day: sheetRows[idx].day || 'Minggu',
+          assignees: sheetRows[idx].assignees || '-',
+          status: sheetRows[idx].status || 'Terjadwal',
+          note: sheetRows[idx].note || '',
+        }));
+        try { localStorage.setItem(storageKey, JSON.stringify(currentMonthlySchedules)); } catch (e) {}
+        return currentMonthlySchedules;
+      }
+
+      if (saved && saved.length === monthWeeks.length) {
+        currentMonthlySchedules = monthWeeks.map((w, idx) => ({
+          ...saved[idx],
+          ...w,
+        }));
+        return currentMonthlySchedules;
+      }
+
+      // Bagi rata seluruh penghuni aktif dari Minggu 1 sampai Minggu Akhir secara berurutan
+      const perWeek = Math.max(Number(defaultCount) || 2, 1);
+      const pool = activeNames.length > 0 ? [...activeNames] : ['Belum ada penghuni'];
+      let cursor = 0;
+
+      currentMonthlySchedules = monthWeeks.map((w) => {
+        const picked = [];
+        for (let k = 0; k < Math.min(perWeek, pool.length); k++) {
+          picked.push(pool[cursor % pool.length]);
+          cursor++;
+        }
+        return {
+          ...w,
+          week: w.weekLabel,
+          day: 'Minggu',
+          assignees: picked.join(', '),
+          status: 'Terjadwal',
+          note: `Giliran terjadwal (${picked.length} orang)`,
+        };
+      });
+
+      try { localStorage.setItem(storageKey, JSON.stringify(currentMonthlySchedules)); } catch (e) {}
+      return currentMonthlySchedules;
+    }
+
+    function persistMonthlyPiket(ym, syncAction, syncData, toastMsg) {
+      const storageKey = 'FORTMESS_PIKET_' + ym;
+      try { localStorage.setItem(storageKey, JSON.stringify(currentMonthlySchedules)); } catch (e) {}
+      if (appData) {
+        appData.piket = currentMonthlySchedules.map(s => ({
+          week: s.weekLabel,
+          day: s.day,
+          assignees: s.assignees,
+          status: s.status,
+          note: s.note,
+        }));
+        saveCache(appData);
+      }
+      renderDashboard();
+      if (toastMsg) showToast(toastMsg);
+
+      // Sinkronkan ke Google Sheets di background
+      runServer('handleAction', { action: syncAction, pin: adminPin, data: syncData }, (res) => {
+        if (res && res.ok && res.data) {
           appData = res.data;
           saveCache(appData);
-          renderDashboard();
-          showToast('Petugas piket berhasil diacak!');
-        } else {
-          showToast(res ? res.error : 'Gagal', true);
         }
       });
     }
 
-    function changePiketDay() {
+    function generateMonthlyPiketUI() {
       if (isCrudBusy) return;
-      const dayName = document.getElementById('piketDayInput').value.trim() || 'Minggu';
-      runCrud('Mengubah hari piket...', { action: 'updatePiketDay', pin: adminPin, data: { dayName } }, (res) => {
-        if (res && res.ok) {
-          appData = res.data;
-          saveCache(appData);
-          renderDashboard();
-          showToast(`Hari piket diganti ke ${dayName}`);
-        } else {
-          showToast(res ? res.error : 'Gagal', true);
+      const ym = document.getElementById('piketMonthFilter').value || new Date().toISOString().slice(0, 7);
+      const monthWeeks = getWeeksInMonth(ym);
+      const activeNames = (appData?.residents || []).filter(r => r.status === 'Aktif').map(r => r.name);
+      if (activeNames.length === 0) return showToast('Tidak ada penghuni aktif', true);
+
+      const perWeek = Math.min(Math.max(Number(document.getElementById('piketCount').value) || 2, 1), activeNames.length);
+      const defaultDay = document.getElementById('piketDayInput').value.trim() || 'Minggu';
+
+      // Fair Round-Robin Shuffle: acak urutan seluruh penghuni aktif, lalu bagi rata Minggu 1..Akhir tanpa dobel di putaran yang sama
+      const shuffle = (arr) => {
+        const copy = [...arr];
+        for (let i = copy.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [copy[i], copy[j]] = [copy[j], copy[i]];
         }
+        return copy;
+      };
+
+      let queue = shuffle(activeNames);
+      currentMonthlySchedules = monthWeeks.map((w) => {
+        const picked = [];
+        while (picked.length < perWeek) {
+          if (queue.length === 0) {
+            // Putaran berikutnya: acak ulang dengan menghindari orang yang sudah masuk di minggu yang sama
+            queue = shuffle(activeNames.filter(n => !picked.includes(n)));
+          }
+          const candidate = queue.shift();
+          if (candidate && !picked.includes(candidate)) {
+            picked.push(candidate);
+          }
+        }
+        return {
+          ...w,
+          week: w.weekLabel,
+          day: defaultDay,
+          assignees: picked.join(', '),
+          status: 'Terjadwal',
+          note: `Diacak adil (${picked.length} orang)`,
+        };
       });
+
+      persistMonthlyPiket(
+        ym,
+        'saveMonthlyPiket',
+        { monthYear: ym, schedules: currentMonthlySchedules },
+        `Jadwal piket ${monthWeeks.length} minggu (${fmtMonthIndo(ym)}) berhasil diacak!`
+      );
     }
 
-    function markPiketDone() {
-      if (isCrudBusy) return;
-      runCrud('Menandai piket selesai...', { action: 'markPiketDone', pin: adminPin, data: {} }, (res) => {
-        if (res && res.ok) {
-          appData = res.data;
-          saveCache(appData);
-          renderDashboard();
-          showToast('Piket minggu ini ditandai Selesai!');
-        } else {
-          showToast(res ? res.error : 'Gagal', true);
-        }
-      });
+    function toggleWeekDayBox(idx) {
+      document.getElementById(`weekDayBox_${idx}`)?.classList.toggle('hidden');
     }
 
-    function toggleSwapBox() {
-      document.getElementById('piketSwapBox').classList.toggle('hidden');
+    function toggleWeekSwapBox(idx) {
+      document.getElementById(`weekSwapBox_${idx}`)?.classList.toggle('hidden');
     }
 
-    function swapPiket() {
-      if (isCrudBusy) return;
-      const oldName = document.getElementById('swapOldName').value.trim();
-      const newName = document.getElementById('swapNewName').value.trim();
-      if (!oldName || !newName) return showToast('Isi nama yang diganti & penggantinya', true);
-      runCrud('Menukar petugas piket...', { action: 'swapPiketMember', pin: adminPin, data: { oldName, newName } }, (res) => {
-        if (res && res.ok) {
-          appData = res.data;
-          saveCache(appData);
-          document.getElementById('swapOldName').value = '';
-          document.getElementById('swapNewName').value = '';
-          document.getElementById('piketSwapBox').classList.add('hidden');
-          renderDashboard();
-          showToast(`Piket ${oldName} ditukar dengan ${newName}`);
-        } else {
-          showToast(res ? res.error : 'Gagal', true);
-        }
-      });
+    function saveWeekDay(idx) {
+      const ym = document.getElementById('piketMonthFilter').value || new Date().toISOString().slice(0, 7);
+      const item = currentMonthlySchedules[idx];
+      if (!item) return;
+      const newDay = document.getElementById(`weekDayInput_${idx}`)?.value.trim();
+      if (!newDay) return showToast('Nama hari tidak boleh kosong', true);
+      item.day = newDay;
+      item.note = `Hari digeser ke ${newDay}`;
+      persistMonthlyPiket(
+        ym,
+        'updateWeekPiket',
+        { week: item.weekLabel, day: item.day, assignees: item.assignees, status: item.status, note: item.note },
+        `${item.weekLabel} diganti ke hari ${newDay}`
+      );
+    }
+
+    function saveWeekSwap(idx) {
+      const ym = document.getElementById('piketMonthFilter').value || new Date().toISOString().slice(0, 7);
+      const item = currentMonthlySchedules[idx];
+      if (!item) return;
+      const oldName = document.getElementById(`weekSwapOld_${idx}`)?.value;
+      const newName = document.getElementById(`weekSwapNew_${idx}`)?.value;
+      if (!oldName || !newName || oldName === newName) return showToast('Pilih nama pengganti yang berbeda', true);
+
+      const list = item.assignees.split(',').map(s => s.trim()).filter(Boolean);
+      const pos = list.findIndex(s => s.toLowerCase() === oldName.toLowerCase());
+      if (pos === -1) return;
+      list[pos] = newName;
+      item.assignees = list.join(', ');
+      item.note = `Tukar: ${oldName} ➔ ${newName}`;
+
+      persistMonthlyPiket(
+        ym,
+        'updateWeekPiket',
+        { week: item.weekLabel, day: item.day, assignees: item.assignees, status: item.status, note: item.note },
+        `${item.weekLabel}: ${oldName} ditukar dengan ${newName}`
+      );
+    }
+
+    function toggleWeekStatus(idx) {
+      const ym = document.getElementById('piketMonthFilter').value || new Date().toISOString().slice(0, 7);
+      const item = currentMonthlySchedules[idx];
+      if (!item) return;
+      item.status = item.status === 'Selesai' ? 'Terjadwal' : 'Selesai';
+      persistMonthlyPiket(
+        ym,
+        'updateWeekPiket',
+        { week: item.weekLabel, day: item.day, assignees: item.assignees, status: item.status, note: item.note },
+        `${item.weekLabel} ditandai ${item.status}`
+      );
     }
 
     function startEditTrx(id) {
