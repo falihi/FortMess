@@ -228,8 +228,13 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
   const initialDataJson = JSON.stringify(getDashboardData());
+  let execUrl = '';
+  try { execUrl = ScriptApp.getService().getUrl() || ''; } catch (err) {}
   const rawHtml = HtmlService.createHtmlOutputFromFile('index').getContent();
-  const injectedHtml = rawHtml.replace('window.__INITIAL_DATA__ = null;', 'window.__INITIAL_DATA__ = ' + initialDataJson + ';');
+  const injectedHtml = rawHtml.replace(
+    'window.__INITIAL_DATA__ = null;',
+    () => `window.__EXEC_URL__ = ${JSON.stringify(execUrl)}; window.__INITIAL_DATA__ = ${initialDataJson};`
+  );
   return HtmlService.createHtmlOutput(injectedHtml)
     .setTitle('FortMess — Kas & Iuran Mes Putra Fortress')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);

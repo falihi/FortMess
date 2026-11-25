@@ -242,9 +242,54 @@
 
   <script>
     window.__INITIAL_DATA__ = null;
+    const DEFAULT_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzjXvvFQ33QzE3DtkjS4vHNcmPnFtaQdpyA1p7A9_EFi1FwFGuyp-NGrThyHI0guhLDdg/exec';
     let appData = null;
     let adminPin = null;
     let editingTrxId = null;
+
+    function getExecUrl() {
+      return window.__EXEC_URL__ || localStorage.getItem('FORTMESS_EXEC_URL') || DEFAULT_EXEC_URL;
+    }
+
+    function runServer(methodName, payload, onSuccess, onError) {
+      let settled = false;
+      const done = (res) => {
+        if (settled) return;
+        settled = true;
+        onSuccess(res);
+      };
+      const fail = (err) => {
+        if (settled) return;
+        settled = true;
+        if (onError) onError(err);
+        else showToast('Error: ' + (err.message || err), true);
+      };
+
+      const fetchFallback = () => {
+        const url = getExecUrl();
+        const opts = methodName === 'getDashboardData'
+          ? { method: 'GET', redirect: 'follow' }
+          : { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) };
+        const target = methodName === 'getDashboardData' ? (url + '?action=data&t=' + Date.now()) : url;
+        fetch(target, opts)
+          .then(r => r.json())
+          .then(done)
+          .catch(fail);
+      };
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        const timer = setTimeout(() => {
+          if (!settled) fetchFallback();
+        }, 4500);
+        const runner = google.script.run
+          .withSuccessHandler((res) => { clearTimeout(timer); done(res); })
+          .withFailureHandler((err) => { clearTimeout(timer); fail(err); });
+        if (methodName === 'getDashboardData') runner.getDashboardData();
+        else runner.handleAction(payload);
+      } else {
+        fetchFallback();
+      }
+    }
 
     const fmtRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
     const escHtml = (s) => String(s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -295,8 +340,10 @@
       const btn = document.getElementById('btnPinSubmit');
       btn.disabled = true;
       btn.textContent = '...';
-      google.script.run
-        .withSuccessHandler((res) => {
+      runServer(
+        'handleAction',
+        { action: 'verifyAuth', pin },
+        (res) => {
           btn.disabled = false;
           btn.textContent = 'Masuk';
           if (res && res.ok) {
@@ -314,13 +361,13 @@
           } else {
             showToast(res ? res.error : 'PIN salah', true);
           }
-        })
-        .withFailureHandler((err) => {
+        },
+        (err) => {
           btn.disabled = false;
           btn.textContent = 'Masuk';
           showToast('Error: ' + err.message, true);
-        })
-        .handleAction({ action: 'verifyAuth', pin });
+        }
+      );
     }
 
     function init() {
@@ -347,29 +394,27 @@
       banner.classList.remove('hidden');
       text.textContent = '⏳ Menyinkronkan data dari Google Sheets...';
 
-      if (typeof google !== 'undefined' && google.script) {
-        google.script.run
-          .withSuccessHandler((res) => {
-            if (!res) {
-              text.textContent = '⚠️ Respons kosong dari server. Klik Muat Ulang.';
-              return;
-            }
-            appData = res;
-            if (res.error) {
-              text.textContent = '⚠️ ' + res.error;
-            } else {
-              banner.classList.add('hidden');
-            }
-            renderDashboard();
-          })
-          .withFailureHandler((err) => {
-            text.textContent = '⚠️ Gagal memuat: ' + err.message;
-            showToast('Gagal memuat data: ' + err.message, true);
-          })
-          .getDashboardData();
-      } else {
-        text.textContent = 'ℹ️ Buka melalui link Web App (/exec) untuk terhubung ke Google Sheets.';
-      }
+      runServer(
+        'getDashboardData',
+        null,
+        (res) => {
+          if (!res) {
+            text.textContent = '⚠️ Respons kosong dari server. Klik Muat Ulang.';
+            return;
+          }
+          appData = res;
+          if (res.error) {
+            text.textContent = '⚠️ ' + res.error;
+          } else {
+            banner.classList.add('hidden');
+          }
+          renderDashboard();
+        },
+        (err) => {
+          text.textContent = '⚠️ Gagal memuat: ' + (err.message || err);
+          showToast('Gagal memuat data: ' + (err.message || err), true);
+        }
+      );
     }
 
     function renderDashboard() {
@@ -543,18 +588,16 @@
       const input = document.getElementById('inputCategories').value;
       const categories = input.split(',').map(s => s.trim()).filter(Boolean);
       if (categories.length === 0) return showToast('Minimal 1 kategori', true);
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            document.getElementById('categoryEditorBox').classList.add('hidden');
-            renderDashboard();
-            showToast('Kategori diperbarui');
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'saveCategories', pin: adminPin, data: { categories } });
+      runServer('handleAction', { action: 'saveCategories', pin: adminPin, data: { categories } }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          document.getElementById('categoryEditorBox').classList.add('hidden');
+          renderDashboard();
+          showToast('Kategori diperbarui');
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function startEditResident(id) {
@@ -582,92 +625,80 @@
       const note = document.getElementById('resNote').value.trim();
       if (!name) return;
       const isEdit = Boolean(id);
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            cancelEditResident();
-            renderDashboard();
-            showToast(isEdit ? `Data ${name} diperbarui` : `Penghuni ${name} ditambahkan`);
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: isEdit ? 'updateResident' : 'addResident', pin: adminPin, data: { id, name, note } });
+      runServer('handleAction', { action: isEdit ? 'updateResident' : 'addResident', pin: adminPin, data: { id, name, note } }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          cancelEditResident();
+          renderDashboard();
+          showToast(isEdit ? `Data ${name} diperbarui` : `Penghuni ${name} ditambahkan`);
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function toggleResident(id) {
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            renderDashboard();
-            showToast('Status penghuni diperbarui');
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'toggleResident', pin: adminPin, data: { id } });
+      runServer('handleAction', { action: 'toggleResident', pin: adminPin, data: { id } }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          renderDashboard();
+          showToast('Status penghuni diperbarui');
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function deleteResident(id, name) {
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            if (document.getElementById('editResId').value === id) cancelEditResident();
-            appData = res.data;
-            renderDashboard();
-            showToast(`Penghuni ${name} dihapus`);
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'deleteResident', pin: adminPin, data: { id } });
+      runServer('handleAction', { action: 'deleteResident', pin: adminPin, data: { id } }, (res) => {
+        if (res && res.ok) {
+          if (document.getElementById('editResId').value === id) cancelEditResident();
+          appData = res.data;
+          renderDashboard();
+          showToast(`Penghuni ${name} dihapus`);
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function generatePiket() {
       const count = document.getElementById('piketCount').value || 2;
       const dayName = document.getElementById('piketDayInput').value.trim() || 'Minggu';
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            renderDashboard();
-            showToast('Petugas piket berhasil diacak!');
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'generateWeeklyPiket', pin: adminPin, data: { count, dayName } });
+      runServer('handleAction', { action: 'generateWeeklyPiket', pin: adminPin, data: { count, dayName } }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          renderDashboard();
+          showToast('Petugas piket berhasil diacak!');
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function changePiketDay() {
       const dayName = document.getElementById('piketDayInput').value.trim() || 'Minggu';
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            renderDashboard();
-            showToast(`Hari piket diganti ke ${dayName}`);
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'updatePiketDay', pin: adminPin, data: { dayName } });
+      runServer('handleAction', { action: 'updatePiketDay', pin: adminPin, data: { dayName } }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          renderDashboard();
+          showToast(`Hari piket diganti ke ${dayName}`);
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function markPiketDone() {
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            renderDashboard();
-            showToast('Piket minggu ini ditandai Selesai!');
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'markPiketDone', pin: adminPin, data: {} });
+      runServer('handleAction', { action: 'markPiketDone', pin: adminPin, data: {} }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          renderDashboard();
+          showToast('Piket minggu ini ditandai Selesai!');
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function toggleSwapBox() {
@@ -678,20 +709,18 @@
       const oldName = document.getElementById('swapOldName').value.trim();
       const newName = document.getElementById('swapNewName').value.trim();
       if (!oldName || !newName) return showToast('Isi nama yang diganti & penggantinya', true);
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            document.getElementById('swapOldName').value = '';
-            document.getElementById('swapNewName').value = '';
-            document.getElementById('piketSwapBox').classList.add('hidden');
-            renderDashboard();
-            showToast(`Piket ${oldName} ditukar dengan ${newName}`);
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'swapPiketMember', pin: adminPin, data: { oldName, newName } });
+      runServer('handleAction', { action: 'swapPiketMember', pin: adminPin, data: { oldName, newName } }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          document.getElementById('swapOldName').value = '';
+          document.getElementById('swapNewName').value = '';
+          document.getElementById('piketSwapBox').classList.add('hidden');
+          renderDashboard();
+          showToast(`Piket ${oldName} ditukar dengan ${newName}`);
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function startEditTrx(id) {
@@ -730,18 +759,16 @@
     }
 
     function deleteTrx(id) {
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            if (editingTrxId === id) cancelEditTrx();
-            appData = res.data;
-            renderDashboard();
-            showToast('Transaksi dihapus');
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'deleteTransaction', pin: adminPin, data: { id } });
+      runServer('handleAction', { action: 'deleteTransaction', pin: adminPin, data: { id } }, (res) => {
+        if (res && res.ok) {
+          if (editingTrxId === id) cancelEditTrx();
+          appData = res.data;
+          renderDashboard();
+          showToast('Transaksi dihapus');
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     async function submitTransaction(e) {
@@ -781,8 +808,10 @@
             removeProof: isEdit ? document.getElementById('trxRemoveProof').checked : false,
           },
         };
-        google.script.run
-          .withSuccessHandler((res) => {
+        runServer(
+          'handleAction',
+          payload,
+          (res) => {
             btn.disabled = false;
             if (res && res.ok) {
               appData = res.data;
@@ -793,13 +822,13 @@
               btn.textContent = defaultLabel;
               showToast(res ? res.error : 'Gagal memuat respons server', true);
             }
-          })
-          .withFailureHandler((err) => {
+          },
+          (err) => {
             btn.disabled = false;
             btn.textContent = defaultLabel;
-            showToast('Gagal: ' + err.message, true);
-          })
-          .handleAction(payload);
+            showToast('Gagal: ' + (err.message || err), true);
+          }
+        );
       } catch (err) {
         btn.disabled = false;
         btn.textContent = defaultLabel;
@@ -810,19 +839,16 @@
     function linkSpreadsheet() {
       const spreadsheetUrl = document.getElementById('inputSheetUrl').value.trim();
       if (!spreadsheetUrl) return showToast('Masukkan link Google Sheet terlebih dahulu', true);
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            document.getElementById('inputSheetUrl').value = '';
-            renderDashboard();
-            showToast('Google Sheet berhasil dihubungkan & 5 tab dibuat!');
-          } else {
-            showToast(res ? res.error : 'Gagal menghubungkan sheet', true);
-          }
-        })
-        .withFailureHandler((err) => showToast('Gagal: ' + err.message, true))
-        .handleAction({ action: 'linkSpreadsheet', pin: adminPin, data: { spreadsheetUrl } });
+      runServer('handleAction', { action: 'linkSpreadsheet', pin: adminPin, data: { spreadsheetUrl } }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          document.getElementById('inputSheetUrl').value = '';
+          renderDashboard();
+          showToast('Google Sheet berhasil dihubungkan & 5 tab dibuat!');
+        } else {
+          showToast(res ? res.error : 'Gagal menghubungkan sheet', true);
+        }
+      });
     }
 
     function copyPaymentInfo() {
@@ -833,63 +859,55 @@
 
     function updatePaymentInfo() {
       const paymentInfo = document.getElementById('inputPaymentInfo').value;
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            renderDashboard();
-            showToast('Info rekening berhasil disimpan');
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'updatePaymentInfo', pin: adminPin, data: { paymentInfo } });
+      runServer('handleAction', { action: 'updatePaymentInfo', pin: adminPin, data: { paymentInfo } }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          renderDashboard();
+          showToast('Info rekening berhasil disimpan');
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function updateDuesAmount() {
       const amount = document.getElementById('inputDuesAmount').value;
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            renderDashboard();
-            showToast('Tarif iuran berhasil diperbarui');
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'updateDuesAmount', pin: adminPin, data: { amount } });
+      runServer('handleAction', { action: 'updateDuesAmount', pin: adminPin, data: { amount } }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          renderDashboard();
+          showToast('Tarif iuran berhasil diperbarui');
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function markPaid(residentId, residentName) {
       const monthYear = document.getElementById('monthFilter').value;
       const amount = appData?.summary?.duesAmount || 80000;
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            renderDashboard();
-            showToast(`Iuran ${residentName} lunas!`);
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'markDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear, amount } });
+      runServer('handleAction', { action: 'markDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear, amount } }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          renderDashboard();
+          showToast(`Iuran ${residentName} lunas!`);
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function unmarkPaid(residentId, residentName) {
       const monthYear = document.getElementById('monthFilter').value;
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            appData = res.data;
-            renderDashboard();
-            showToast(`Status lunas ${residentName} dibatalkan`);
-          } else {
-            showToast(res ? res.error : 'Gagal', true);
-          }
-        })
-        .handleAction({ action: 'unmarkDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear } });
+      runServer('handleAction', { action: 'unmarkDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear } }, (res) => {
+        if (res && res.ok) {
+          appData = res.data;
+          renderDashboard();
+          showToast(`Status lunas ${residentName} dibatalkan`);
+        } else {
+          showToast(res ? res.error : 'Gagal', true);
+        }
+      });
     }
 
     function copyWaReminder() {
