@@ -10,20 +10,20 @@
     body { font-family: 'Inter', sans-serif; }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen antialiased">
+<body class="bg-[#faf9f6] text-stone-800 min-h-screen antialiased">
   <div class="max-w-4xl mx-auto p-4 sm:p-6 space-y-5">
     <!-- Hero Header -->
-    <header class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-5 sm:p-6 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <header class="bg-stone-900 text-white p-5 sm:p-6 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div class="space-y-1">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2.5">
           <span class="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 font-extrabold text-sm border border-emerald-500/30">FM</span>
           <h1 class="text-xl sm:text-2xl font-extrabold tracking-tight">FortMess</h1>
         </div>
-        <p id="headerSubtitle" class="text-xs text-slate-300">Transparansi Kas & Iuran Bulanan (jatuh tempo tgl 30)</p>
+        <p id="headerSubtitle" class="text-xs text-stone-300">Transparansi Kas & Iuran Bulanan (jatuh tempo tgl 30)</p>
       </div>
       <div class="flex items-center gap-2.5">
-        <span id="roleBadge" class="text-xs px-3 py-1.5 rounded-full bg-white/10 text-slate-200 font-medium backdrop-blur-sm border border-white/10">Mode: Penghuni</span>
-        <button id="btnAdminAuth" onclick="promptAdminPin()" class="text-xs px-4 py-1.5 rounded-full bg-emerald-500 text-slate-950 font-semibold hover:bg-emerald-400 transition shadow-sm">
+        <span id="roleBadge" class="text-xs px-3 py-1.5 rounded-full bg-white/10 text-stone-200 font-medium border border-white/10">Mode: Penghuni</span>
+        <button id="btnAdminAuth" onclick="promptAdminPin()" class="text-xs px-4 py-1.5 rounded-full bg-emerald-500 text-stone-950 font-semibold hover:bg-emerald-400 transition">
           Login Bendahara
         </button>
       </div>
@@ -33,7 +33,7 @@
     <div id="toast" class="hidden fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition"></div>
 
     <!-- Loading State -->
-    <div id="loadingState" class="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500 text-sm">
+    <div id="loadingState" class="bg-white p-8 rounded-2xl border border-stone-200 text-center text-stone-500 text-sm">
       Memuat data kas dari Google Sheets...
     </div>
 
@@ -41,110 +41,182 @@
     <main id="mainContent" class="hidden space-y-5">
       <!-- Summary Cards -->
       <section class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition">
-          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Saldo Kas</p>
-          <p id="valBalance" class="text-2xl font-extrabold text-slate-900 mt-1.5">Rp 0</p>
+        <div class="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-sm">
+          <p class="text-xs font-medium text-stone-500 uppercase tracking-wider">Saldo Kas</p>
+          <p id="valBalance" class="text-2xl font-extrabold text-stone-900 mt-1.5">Rp 0</p>
         </div>
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition">
-          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Pemasukan</p>
-          <p id="valIncome" class="text-xl font-bold text-emerald-600 mt-1.5">Rp 0</p>
+        <div class="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-sm">
+          <p class="text-xs font-medium text-stone-500 uppercase tracking-wider">Pemasukan</p>
+          <p id="valIncome" class="text-xl font-bold text-emerald-700 mt-1.5">Rp 0</p>
         </div>
-        <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition">
-          <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Pengeluaran</p>
+        <div class="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-sm">
+          <p class="text-xs font-medium text-stone-500 uppercase tracking-wider">Pengeluaran</p>
           <p id="valExpense" class="text-xl font-bold text-rose-600 mt-1.5">Rp 0</p>
         </div>
       </section>
 
       <!-- Info Rekening Transfer -->
-      <section class="bg-blue-50/70 p-4 rounded-2xl border border-blue-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <section class="bg-white p-4 rounded-2xl border border-stone-200/90 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <p class="text-xs font-semibold text-blue-900">Rekening Pembayaran Iuran</p>
-          <p id="valPaymentInfo" class="text-sm font-bold text-blue-800 mt-0.5">-</p>
+          <p class="text-xs font-medium text-stone-500">Rekening Pembayaran Iuran</p>
+          <p id="valPaymentInfo" class="text-sm font-bold text-stone-900 mt-0.5">-</p>
         </div>
-        <button onclick="copyPaymentInfo()" class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 self-start sm:self-center">
+        <button onclick="copyPaymentInfo()" class="text-xs px-3.5 py-2 rounded-xl border border-stone-200 hover:bg-stone-100 font-medium self-start sm:self-center">
           Copy No. Rekening
         </button>
       </section>
 
-      <!-- Admin Panel (Hidden by default) -->
-      <section id="adminPanel" class="hidden bg-amber-50/60 p-5 rounded-2xl border border-amber-200 space-y-4">
+      <!-- Pengaturan Bendahara (Tarif & Rekening) -->
+      <section id="adminSettingsPanel" class="hidden bg-white p-5 rounded-2xl border border-stone-200/90 shadow-sm space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-sm font-bold text-amber-900">Panel Bendahara</h2>
-          <div class="flex items-center gap-2">
-            <input id="inputDuesAmount" type="number" min="1000" placeholder="Tarif Iuran" class="w-28 px-2.5 py-1 text-xs rounded-lg border border-amber-300 bg-white" />
-            <button onclick="updateDuesAmount()" class="text-xs px-2.5 py-1.5 rounded-lg bg-amber-700 text-white hover:bg-amber-800">
-              Simpan Tarif
-            </button>
-            <button onclick="copyWaReminder()" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
-              Copy Rekap WA
-            </button>
+          <div>
+            <h2 class="text-sm font-bold text-stone-900">Pengaturan Bendahara</h2>
+            <p id="sheetInfoText" class="text-xs text-stone-500 mt-0.5">Mengecek koneksi Google Sheet...</p>
           </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <input id="inputPaymentInfo" type="text" placeholder="Contoh: BCA 1234567890 a.n. Falih" class="flex-1 min-w-[200px] px-3 py-1.5 text-xs rounded-lg border border-amber-300 bg-white" />
-          <button onclick="updatePaymentInfo()" class="text-xs px-3 py-1.5 rounded-lg bg-amber-700 text-white hover:bg-amber-800">
-            Simpan Rekening
+          <button onclick="copyWaReminder()" class="text-xs px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700">
+            Copy Rekap WA
           </button>
         </div>
-
-        <form id="trxForm" onsubmit="submitTransaction(event)" class="grid grid-cols-1 sm:grid-cols-5 gap-2">
-          <select id="trxType" class="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white">
-            <option value="Pengeluaran">Pengeluaran</option>
-            <option value="Pemasukan">Pemasukan</option>
-          </select>
-          <div class="flex gap-1">
-            <select id="trxCategory" class="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"></select>
-            <button type="button" onclick="manageCategories()" class="px-2 py-1 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100" title="Kelola Kategori">⚙️</button>
+        <div class="flex gap-2">
+          <input id="inputSheetUrl" type="text" placeholder="Paste link Google Sheet jika ingin ganti/hubungkan manual..." class="flex-1 px-3.5 py-2 text-xs rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:border-stone-500" />
+          <button onclick="linkSpreadsheet()" class="px-3.5 py-2 text-xs font-semibold rounded-xl border border-stone-300 bg-white hover:bg-stone-100">Hubungkan Sheet</button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div class="flex gap-2">
+            <input id="inputDuesAmount" type="number" min="1000" placeholder="Tarif Iuran (Rp)" class="flex-1 px-3.5 py-2 text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:border-stone-500" />
+            <button onclick="updateDuesAmount()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-stone-900 text-white hover:bg-stone-800">Simpan Tarif</button>
           </div>
-          <input id="trxDesc" type="text" placeholder="Keterangan" required class="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white sm:col-span-2" />
-          <input id="trxNominal" type="text" inputmode="numeric" oninput="formatNominalInput(this)" placeholder="Nominal (100.000)" required class="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white" />
-          <input id="trxProof" type="file" accept="image/*" class="sm:col-span-5 text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300" />
-          <button type="submit" class="sm:col-span-5 py-2 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-700">
-            + Catat Transaksi
+          <div class="flex gap-2">
+            <input id="inputPaymentInfo" type="text" placeholder="Contoh: BCA 1234567890 a.n. Falih" class="flex-1 px-3.5 py-2 text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:border-stone-500" />
+            <button onclick="updatePaymentInfo()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-stone-900 text-white hover:bg-stone-800">Simpan Rekening</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Form CRUD Transaksi Buku Kas (Sesuai Referensi UI) -->
+      <section id="adminPanel" class="hidden bg-white p-5 rounded-2xl border border-stone-200/90 shadow-sm">
+        <form id="trxForm" onsubmit="submitTransaction(event)" class="space-y-3">
+          <div id="editBanner" class="hidden flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-900 px-3.5 py-2 rounded-xl text-xs font-medium">
+            <span id="editBannerText">Mode Edit Transaksi</span>
+            <button type="button" onclick="cancelEditTrx()" class="underline font-semibold">Batal Edit</button>
+          </div>
+
+          <!-- Toggle Pemasukan / Pengeluaran -->
+          <input type="hidden" id="trxType" value="Pemasukan" />
+          <div class="grid grid-cols-2 gap-2.5">
+            <button type="button" id="btnTypeIn" onclick="setTrxType('Pemasukan')" class="py-2.5 rounded-xl text-sm font-semibold transition bg-stone-900 text-white">
+              Pemasukan
+            </button>
+            <button type="button" id="btnTypeOut" onclick="setTrxType('Pengeluaran')" class="py-2.5 rounded-xl text-sm font-medium transition bg-white text-stone-700 border border-stone-200 hover:bg-stone-50">
+              Pengeluaran
+            </button>
+          </div>
+
+          <!-- Tanggal & Qty (opsional) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <input id="trxDate" type="date" required class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-stone-200 bg-stone-50/40 focus:bg-white focus:outline-none focus:border-stone-500" />
+            <input id="trxQty" type="number" min="1" placeholder="Qty (opsional)" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-stone-200 bg-stone-50/40 focus:bg-white focus:outline-none focus:border-stone-500" />
+          </div>
+
+          <!-- Kategori & Keterangan -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div class="flex gap-1.5">
+              <select id="trxCategory" class="flex-1 px-3.5 py-2.5 text-sm rounded-xl border border-stone-200 bg-stone-50/40 focus:bg-white focus:outline-none focus:border-stone-500">
+                <option value="Iuran Bulanan">Iuran Bulanan</option>
+                <option value="Token Listrik">Token Listrik</option>
+                <option value="Air Galon">Air Galon</option>
+                <option value="Gas">Gas</option>
+                <option value="Kebersihan">Kebersihan</option>
+                <option value="Lainnya">Lainnya</option>
+              </select>
+              <button type="button" onclick="manageCategories()" class="px-3 py-2 text-xs rounded-xl border border-stone-200 bg-white hover:bg-stone-100" title="Kelola Kategori">⚙️</button>
+            </div>
+            <input id="trxDesc" type="text" placeholder="Keterangan (mis. Iuran Falih, Air galon)" required class="sm:col-span-2 w-full px-3.5 py-2.5 text-sm rounded-xl border border-stone-200 bg-stone-50/40 focus:bg-white focus:outline-none focus:border-stone-500" />
+          </div>
+
+          <!-- Nominal (Rp) -->
+          <input id="trxNominal" type="text" inputmode="numeric" oninput="formatNominalInput(this)" placeholder="Nominal (Rp)" required class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-stone-200 bg-stone-50/40 focus:bg-white focus:outline-none focus:border-stone-500" />
+
+          <!-- Upload Bukti Foto (opsional) -->
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-stone-500">Bukti Foto (opsional):</span>
+              <input id="trxProof" type="file" accept="image/*" class="text-xs text-stone-600 file:mr-2.5 file:py-1.5 file:px-3 file:rounded-lg file:border file:border-stone-200 file:text-xs file:font-medium file:bg-stone-50 file:text-stone-700 hover:file:bg-stone-100" />
+            </div>
+            <label id="removeProofWrap" class="hidden items-center gap-1.5 text-xs text-rose-600 cursor-pointer">
+              <input id="trxRemoveProof" type="checkbox" class="rounded" /> Hapus foto lama
+            </label>
+          </div>
+
+          <!-- Submit Button -->
+          <button id="btnSubmitTrx" type="submit" class="w-full py-3 rounded-xl bg-stone-900 text-white text-sm font-semibold hover:bg-stone-800 transition">
+            Tambah
           </button>
         </form>
       </section>
 
-      <!-- Daftar Penghuni Aktif & Iuran -->
-      <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-sm font-bold text-slate-900">Status Iuran Penghuni</h2>
-          <div class="flex items-center gap-2">
-            <button id="btnAddResident" onclick="addResident()" class="hidden text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700">+ Penghuni</button>
-            <input id="monthFilter" type="month" onchange="renderDashboard()" class="text-xs px-2.5 py-1 rounded-lg border border-slate-300" />
-          </div>
+      <!-- Filter Bulan & Tabel Buku Kas (Sesuai Referensi UI) -->
+      <section class="space-y-3">
+        <div class="flex items-center gap-2">
+          <select id="ledgerMonthFilter" onchange="renderDashboard()" class="flex-1 px-4 py-3 text-sm rounded-xl border border-stone-200 bg-white shadow-sm focus:outline-none focus:border-stone-400">
+            <option value="ALL">Semua bulan</option>
+          </select>
+          <button onclick="exportCsv()" class="px-4 py-3 text-xs font-medium rounded-xl border border-stone-200 bg-white shadow-sm hover:bg-stone-50 shrink-0">
+            Export CSV
+          </button>
         </div>
-        <div id="residentsList" class="divide-y divide-slate-100 text-sm"></div>
+
+        <div class="bg-white rounded-2xl border border-stone-200/90 shadow-sm overflow-x-auto">
+          <table class="w-full text-sm text-left border-collapse">
+            <thead>
+              <tr class="border-b border-stone-200/80 text-xs text-stone-500 font-medium">
+                <th class="py-3 px-4">Tanggal</th>
+                <th class="py-3 px-4">Keterangan</th>
+                <th class="py-3 px-4 text-right">Masuk</th>
+                <th class="py-3 px-4 text-right">Keluar</th>
+                <th class="py-3 px-4 text-right">Saldo</th>
+                <th id="thLedgerAction" class="hidden py-3 px-4 text-right w-24"></th>
+              </tr>
+            </thead>
+            <tbody id="ledgerList" class="divide-y divide-stone-100"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CRUD Penghuni & Status Iuran -->
+      <section class="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-sm space-y-3.5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-sm font-bold text-stone-900">Penghuni & Status Iuran</h2>
+          <input id="monthFilter" type="month" onchange="renderDashboard()" class="text-xs px-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50/50" />
+        </div>
+
+        <!-- Inline Form CRUD Penghuni (Admin Only) -->
+        <form id="residentForm" onsubmit="submitResident(event)" class="hidden grid grid-cols-1 sm:grid-cols-5 gap-2 p-3 rounded-xl bg-stone-50 border border-stone-200/80">
+          <input type="hidden" id="editResId" value="" />
+          <input id="resName" type="text" placeholder="Nama penghuni..." required class="sm:col-span-2 px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white focus:outline-none focus:border-stone-500" />
+          <input id="resNote" type="text" placeholder="Catatan / Kamar (opsional)" class="sm:col-span-2 px-3 py-2 text-xs rounded-lg border border-stone-200 bg-white focus:outline-none focus:border-stone-500" />
+          <div class="flex gap-1.5">
+            <button id="btnSubmitRes" type="submit" class="flex-1 py-2 px-3 rounded-lg bg-stone-900 text-white text-xs font-semibold hover:bg-stone-800">Tambah</button>
+            <button id="btnCancelRes" type="button" onclick="cancelEditResident()" class="hidden py-2 px-2.5 rounded-lg border border-stone-300 bg-white text-xs text-stone-600 hover:bg-stone-100">✕</button>
+          </div>
+        </form>
+
+        <div id="residentsList" class="divide-y divide-stone-100 text-sm"></div>
       </section>
 
       <!-- Jadwal Piket Mingguan -->
-      <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+      <section class="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-sm space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-sm font-bold text-slate-900">Jadwal Piket Mingguan</h2>
+          <h2 class="text-sm font-bold text-stone-900">Jadwal Piket Mingguan</h2>
           <div id="piketAdminBtns" class="hidden flex flex-wrap items-center gap-2">
-            <input id="piketCount" type="number" min="1" max="10" value="2" class="w-14 px-2 py-1 text-xs rounded-lg border border-slate-300" title="Jumlah orang" />
-            <button onclick="generatePiket()" class="text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700">Acak Petugas</button>
-            <button onclick="changePiketDay()" class="text-xs px-2.5 py-1 rounded-lg border border-slate-300 hover:bg-slate-100">Ganti Hari</button>
-            <button onclick="swapPiket()" class="text-xs px-2.5 py-1 rounded-lg border border-blue-300 text-blue-700 hover:bg-blue-50">Tukar Orang</button>
-            <button onclick="markPiketDone()" class="text-xs px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Tandai Selesai</button>
+            <input id="piketCount" type="number" min="1" max="10" value="2" class="w-14 px-2.5 py-1 text-xs rounded-lg border border-stone-200" title="Jumlah orang" />
+            <button onclick="generatePiket()" class="text-xs px-3 py-1.5 rounded-lg bg-stone-900 text-white hover:bg-stone-800">Acak Petugas</button>
+            <button onclick="changePiketDay()" class="text-xs px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-50">Ganti Hari</button>
+            <button onclick="swapPiket()" class="text-xs px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-50">Tukar Orang</button>
+            <button onclick="markPiketDone()" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Tandai Selesai</button>
           </div>
         </div>
         <div id="piketList" class="text-sm"></div>
-      </section>
-
-      <!-- Buku Kas -->
-      <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 class="text-sm font-bold text-slate-900">Riwayat Buku Kas</h2>
-          <div class="flex items-center gap-2">
-            <select id="ledgerMonthFilter" onchange="renderDashboard()" class="text-xs px-2.5 py-1 rounded-lg border border-slate-300 bg-white">
-              <option value="ALL">Semua Bulan</option>
-            </select>
-            <button onclick="exportCsv()" class="text-xs px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-100">Export CSV</button>
-          </div>
-        </div>
-        <div id="ledgerList" class="divide-y divide-slate-100 text-xs"></div>
       </section>
     </main>
   </div>
@@ -152,21 +224,42 @@
   <script>
     let appData = null;
     let adminPin = null;
+    let editingTrxId = null;
 
     const fmtRp = (n) => 'Rp ' + Number(n || 0).toLocaleString('id-ID');
     const escHtml = (s) => String(s || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    const fmtShortDate = (iso) => {
+      const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+      return m ? `${m[3]}/${m[2]}/${m[1].slice(2)}` : escHtml(iso);
+    };
+    const getDriveThumb = (url) => {
+      const m = String(url || '').match(/\/d\/([a-zA-Z0-9_-]+)/) || String(url || '').match(/[?&]id=([a-zA-Z0-9_-]+)/);
+      return m ? `https://lh3.googleusercontent.com/d/${m[1]}=w120` : '';
+    };
 
     function showToast(msg, isError = false) {
       const el = document.getElementById('toast');
       el.textContent = msg;
-      el.className = `fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${isError ? 'bg-rose-600' : 'bg-emerald-600'}`;
+      el.className = `fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${isError ? 'bg-rose-600' : 'bg-stone-900'}`;
       el.classList.remove('hidden');
       setTimeout(() => el.classList.add('hidden'), 3000);
     }
 
+    function setTrxType(type) {
+      document.getElementById('trxType').value = type;
+      const btnIn = document.getElementById('btnTypeIn');
+      const btnOut = document.getElementById('btnTypeOut');
+      const activeCls = 'py-2.5 rounded-xl text-sm font-semibold transition bg-stone-900 text-white';
+      const idleCls = 'py-2.5 rounded-xl text-sm font-medium transition bg-white text-stone-700 border border-stone-200 hover:bg-stone-50';
+      btnIn.className = type === 'Pemasukan' ? activeCls : idleCls;
+      btnOut.className = type === 'Pengeluaran' ? activeCls : idleCls;
+    }
+
     function init() {
-      const now = new Date();
-      document.getElementById('monthFilter').value = now.toISOString().slice(0, 7);
+      const todayIso = new Date().toISOString().slice(0, 10);
+      document.getElementById('monthFilter').value = todayIso.slice(0, 7);
+      document.getElementById('trxDate').value = todayIso;
+      setTrxType('Pengeluaran');
       loadData();
     }
 
@@ -193,72 +286,114 @@
       document.getElementById('inputDuesAmount').value = summary.duesAmount;
       document.getElementById('valPaymentInfo').textContent = summary.paymentInfo || 'Belum diatur oleh Bendahara';
       document.getElementById('inputPaymentInfo').value = summary.paymentInfo || '';
+      const sheetInfoEl = document.getElementById('sheetInfoText');
+      if (summary.spreadsheetUrl) {
+        sheetInfoEl.innerHTML = `Terhubung ke: <a href="${escHtml(summary.spreadsheetUrl)}" target="_blank" rel="noopener noreferrer" class="font-semibold text-emerald-700 underline">${escHtml(summary.spreadsheetName || 'Google Sheet')}</a>`;
+      }
 
-      const cats = summary.categories || ['Token Listrik', 'Air Galon', 'Gas', 'Kebersihan', 'Lainnya'];
+      const baseCats = summary.categories || ['Token Listrik', 'Air Galon', 'Gas', 'Kebersihan', 'Lainnya'];
+      const cats = baseCats.includes('Iuran Bulanan') ? baseCats : ['Iuran Bulanan', ...baseCats];
+      const prevCat = document.getElementById('trxCategory').value;
       document.getElementById('trxCategory').innerHTML = cats.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+      if (cats.includes(prevCat)) document.getElementById('trxCategory').value = prevCat;
 
       const ledgerFilterEl = document.getElementById('ledgerMonthFilter');
       const currentLedgerFilter = ledgerFilterEl.value || 'ALL';
       const months = [...new Set(transactions.map(t => String(t.date).slice(0, 7)).filter(Boolean))].sort().reverse();
-      ledgerFilterEl.innerHTML = '<option value="ALL">Semua Bulan</option>' + months.map(m => `<option value="${m}">${m}</option>`).join('');
+      ledgerFilterEl.innerHTML = '<option value="ALL">Semua bulan</option>' + months.map(m => `<option value="${m}">${m}</option>`).join('');
       ledgerFilterEl.value = months.includes(currentLedgerFilter) ? currentLedgerFilter : 'ALL';
+
       document.getElementById('valBalance').textContent = fmtRp(summary.balance);
       document.getElementById('valIncome').textContent = fmtRp(summary.totalIncome);
       document.getElementById('valExpense').textContent = fmtRp(summary.totalExpense);
 
+      if (adminPin) {
+        document.getElementById('thLedgerAction').classList.remove('hidden');
+      }
+
+      // Hitung running balance kronologis (dari terlama ke terbaru)
+      const chronological = [...transactions].reverse();
+      let running = 0;
+      const withBalance = chronological.map(t => {
+        running += (t.type === 'Pemasukan' ? Number(t.nominal || 0) : -Number(t.nominal || 0));
+        return { ...t, runningBalance: running };
+      }).reverse();
+
+      const filterMonth = document.getElementById('ledgerMonthFilter').value;
+      const filteredTrx = filterMonth === 'ALL' ? withBalance : withBalance.filter(t => String(t.date).startsWith(filterMonth));
+
+      const trxHtml = filteredTrx.map(t => {
+        const safeUrl = (t.proofUrl && t.proofUrl.startsWith('https://')) ? escHtml(t.proofUrl) : '';
+        const thumbUrl = safeUrl ? getDriveThumb(t.proofUrl) : '';
+        const isIn = t.type === 'Pemasukan';
+        const qtyBadge = t.qty ? `<span class="text-stone-400 font-normal ml-1">&times;${Number(t.qty)}</span>` : '';
+        return `
+        <tr class="hover:bg-stone-50/80 transition">
+          <td class="py-3.5 px-4 whitespace-nowrap text-stone-700">${fmtShortDate(t.date)}</td>
+          <td class="py-3.5 px-4">
+            <div class="flex items-center gap-2.5">
+              ${thumbUrl ? `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="shrink-0"><img src="${thumbUrl}" alt="Bukti" class="w-8 h-8 rounded-lg object-cover border border-stone-200" /></a>` : ''}
+              <div>
+                <span class="font-medium text-stone-900">${escHtml(t.description)}</span>${qtyBadge}
+                <div class="text-[11px] text-stone-400">${escHtml(t.category)}${safeUrl ? ` • <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline">Foto</a>` : ''}</div>
+              </div>
+            </div>
+          </td>
+          <td class="py-3.5 px-4 text-right whitespace-nowrap font-medium text-emerald-700">${isIn ? fmtRp(t.nominal) : ''}</td>
+          <td class="py-3.5 px-4 text-right whitespace-nowrap font-medium text-rose-600">${!isIn ? fmtRp(t.nominal) : ''}</td>
+          <td class="py-3.5 px-4 text-right whitespace-nowrap font-semibold text-stone-900">${fmtRp(t.runningBalance)}</td>
+          ${adminPin ? `
+          <td class="py-3.5 px-4 text-right whitespace-nowrap">
+            <div class="inline-flex items-center gap-1.5">
+              <button onclick="startEditTrx('${escHtml(t.id)}')" title="Edit" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">✎</button>
+              <button onclick="deleteTrx('${escHtml(t.id)}')" title="Hapus" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200">&times;</button>
+            </div>
+          </td>` : ''}
+        </tr>`;
+      }).join('');
+
+      const colSpan = adminPin ? 6 : 5;
+      document.getElementById('ledgerList').innerHTML = trxHtml || `<tr><td colspan="${colSpan}" class="py-8 text-center text-stone-400 text-xs">Belum ada transaksi pada periode ini.</td></tr>`;
+
+      // Render Daftar Penghuni
       const selectedMonth = document.getElementById('monthFilter').value;
       const visibleRes = adminPin ? residents : residents.filter(r => r.status === 'Aktif');
       const resHtml = visibleRes.map(r => {
         const isAktif = r.status === 'Aktif';
         const paid = dues.find(d => d.residentId === r.id && d.month === selectedMonth && d.status === 'Lunas');
         return `
-          <div class="py-2.5 flex items-center justify-between gap-2 ${!isAktif ? 'opacity-50' : ''}">
+          <div class="py-3 flex flex-wrap items-center justify-between gap-2 ${!isAktif ? 'opacity-50' : ''}">
             <div>
-              <p class="font-medium text-slate-800">${escHtml(r.name)} ${!isAktif ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Non-Aktif</span>' : ''}</p>
-              <p class="text-xs text-slate-400">${escHtml(r.id)}</p>
+              <p class="font-medium text-stone-900">${escHtml(r.name)} ${!isAktif ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-stone-200 text-stone-600 ml-1">Non-Aktif</span>' : ''}</p>
+              <p class="text-xs text-stone-400">${escHtml(r.id)}${r.note ? ` • ${escHtml(r.note)}` : ''}</p>
             </div>
-            <div class="flex items-center gap-2">
-              ${isAktif ? `<span class="text-xs px-2.5 py-1 rounded-full font-medium ${paid ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${paid ? 'Lunas' : 'Belum Bayar'}</span>` : ''}
-              ${(isAktif && !paid && adminPin) ? `<button onclick="markPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700">Verifikasi</button>` : ''}
-              ${adminPin ? `<button onclick="toggleResident('${escHtml(r.id)}')" class="text-xs px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-100">${isAktif ? 'Non-Aktifkan' : 'Aktifkan'}</button>` : ''}
+            <div class="flex flex-wrap items-center gap-1.5">
+              ${isAktif ? `<span class="text-xs px-2.5 py-1 rounded-full font-medium ${paid ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">${paid ? 'Lunas' : 'Belum Bayar'}</span>` : ''}
+              ${(isAktif && !paid && adminPin) ? `<button onclick="markPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-3 py-1.5 rounded-lg bg-stone-900 text-white hover:bg-stone-800">Verifikasi</button>` : ''}
+              ${adminPin ? `
+                <button onclick="toggleResident('${escHtml(r.id)}')" class="text-xs px-2.5 py-1.5 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">${isAktif ? 'Non-Aktifkan' : 'Aktifkan'}</button>
+                <button onclick="startEditResident('${escHtml(r.id)}')" title="Edit Penghuni" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">✎</button>
+                <button onclick="deleteResident('${escHtml(r.id)}', '${escHtml(r.name)}')" title="Hapus Penghuni" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200">&times;</button>
+              ` : ''}
             </div>
           </div>`;
       }).join('');
-      document.getElementById('residentsList').innerHTML = resHtml || '<p class="py-4 text-center text-slate-400 text-xs">Belum ada penghuni aktif.</p>';
+      document.getElementById('residentsList').innerHTML = resHtml || '<p class="py-4 text-center text-stone-400 text-xs">Belum ada penghuni aktif.</p>';
 
-      const filterMonth = document.getElementById('ledgerMonthFilter').value;
-      const filteredTrx = filterMonth === 'ALL' ? transactions : transactions.filter(t => String(t.date).startsWith(filterMonth));
-      const trxHtml = filteredTrx.slice(0, 50).map(t => {
-        const safeUrl = (t.proofUrl && t.proofUrl.startsWith('https://')) ? escHtml(t.proofUrl) : '';
-        return `
-        <div class="py-2.5 flex items-center justify-between gap-2">
-          <div>
-            <p class="font-medium text-slate-800">${escHtml(t.description)} <span class="text-slate-400">(${escHtml(t.category)})</span></p>
-            <p class="text-slate-400">${escHtml(t.date)} • ${escHtml(t.id)} ${safeUrl ? `• <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline">Lihat Bukti</a>` : ''}</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="font-semibold ${t.type === 'Pemasukan' ? 'text-emerald-600' : 'text-rose-600'}">
-              ${t.type === 'Pemasukan' ? '+' : '-'}${fmtRp(t.nominal)}
-            </span>
-            ${adminPin ? `<button onclick="deleteTrx('${escHtml(t.id)}')" class="text-xs text-rose-500 hover:underline">Hapus</button>` : ''}
-          </div>
-        </div>`;
-      }).join('');
-      document.getElementById('ledgerList').innerHTML = trxHtml || '<p class="py-4 text-center text-slate-400">Belum ada transaksi di bulan ini.</p>';
-
+      // Render Piket
       const piket = (appData.piket || [])[0];
       if (piket) {
         document.getElementById('piketList').innerHTML = `
-          <div class="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div class="p-3.5 rounded-xl bg-stone-50 border border-stone-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
-              <p class="text-xs font-semibold text-emerald-800">Jadwal: ${escHtml(piket.day)} (${escHtml(piket.week)})</p>
-              <p class="text-base font-bold text-slate-900 mt-0.5">${escHtml(piket.assignees)}</p>
-              ${piket.note ? `<p class="text-xs text-slate-500 mt-0.5">${escHtml(piket.note)}</p>` : ''}
+              <p class="text-xs font-semibold text-stone-500">Jadwal: ${escHtml(piket.day)} (${escHtml(piket.week)})</p>
+              <p class="text-base font-bold text-stone-900 mt-0.5">${escHtml(piket.assignees)}</p>
+              ${piket.note ? `<p class="text-xs text-stone-500 mt-0.5">${escHtml(piket.note)}</p>` : ''}
             </div>
             <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-600 text-white font-medium self-start sm:self-center">${escHtml(piket.status)}</span>
           </div>`;
       } else {
-        document.getElementById('piketList').innerHTML = '<p class="py-3 text-center text-slate-400 text-xs">Jadwal piket mingguan belum diatur.</p>';
+        document.getElementById('piketList').innerHTML = '<p class="py-3 text-center text-stone-400 text-xs">Jadwal piket mingguan belum diatur.</p>';
       }
     }
 
@@ -267,28 +402,56 @@
       if (!pin) return;
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
             adminPin = pin;
             document.getElementById('roleBadge').textContent = 'Mode: Bendahara';
             document.getElementById('roleBadge').className = 'text-xs px-3 py-1.5 rounded-full bg-amber-400/20 text-amber-300 font-semibold border border-amber-400/30';
+            document.getElementById('adminSettingsPanel').classList.remove('hidden');
             document.getElementById('adminPanel').classList.remove('hidden');
+            document.getElementById('residentForm').classList.remove('hidden');
             document.getElementById('piketAdminBtns').classList.remove('hidden');
-            document.getElementById('btnAddResident').classList.remove('hidden');
             document.getElementById('btnAdminAuth').classList.add('hidden');
             renderDashboard();
             showToast('Login Bendahara berhasil');
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal verifikasi PIN', true);
           }
         })
         .handleAction({ action: 'verifyAuth', pin });
     }
 
-    function readFileAsBase64(file) {
+    function compressImage(file, maxDim = 1280, quality = 0.72) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
+        reader.onerror = () => reject(new Error('Gagal membaca file gambar'));
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onerror = () => reject(new Error('Format gambar tidak didukung'));
+          img.onload = () => {
+            let { width, height } = img;
+            if (width > maxDim || height > maxDim) {
+              if (width >= height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            const base64 = dataUrl.split(',')[1];
+            const cleanName = (file.name || 'bukti').replace(/\.[^.]+$/, '') + '.jpg';
+            resolve({ base64, mimeType: 'image/jpeg', fileName: cleanName });
+          };
+          img.src = ev.target.result;
+        };
         reader.readAsDataURL(file);
       });
     }
@@ -305,59 +468,100 @@
       const categories = input.split(',').map(s => s.trim()).filter(Boolean);
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
             appData = res.data;
             renderDashboard();
             showToast('Kategori diperbarui');
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal', true);
           }
         })
         .handleAction({ action: 'saveCategories', pin: adminPin, data: { categories } });
     }
 
-    function addResident() {
-      const name = prompt('Nama penghuni baru:');
+    // CRUD Penghuni (Inline Form)
+    function startEditResident(id) {
+      const r = (appData?.residents || []).find(x => x.id === id);
+      if (!r) return;
+      document.getElementById('editResId').value = r.id;
+      document.getElementById('resName').value = r.name;
+      document.getElementById('resNote').value = r.note || '';
+      document.getElementById('btnSubmitRes').textContent = 'Simpan';
+      document.getElementById('btnCancelRes').classList.remove('hidden');
+      document.getElementById('resName').focus();
+    }
+
+    function cancelEditResident() {
+      document.getElementById('editResId').value = '';
+      document.getElementById('residentForm').reset();
+      document.getElementById('btnSubmitRes').textContent = 'Tambah';
+      document.getElementById('btnCancelRes').classList.add('hidden');
+    }
+
+    function submitResident(e) {
+      e.preventDefault();
+      const id = document.getElementById('editResId').value;
+      const name = document.getElementById('resName').value.trim();
+      const note = document.getElementById('resNote').value.trim();
       if (!name) return;
+      const isEdit = Boolean(id);
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
             appData = res.data;
+            cancelEditResident();
             renderDashboard();
-            showToast(`Penghuni ${name} ditambahkan`);
+            showToast(isEdit ? `Data ${name} diperbarui` : `Penghuni ${name} ditambahkan`);
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal', true);
           }
         })
-        .handleAction({ action: 'addResident', pin: adminPin, data: { name } });
+        .handleAction({ action: isEdit ? 'updateResident' : 'addResident', pin: adminPin, data: { id, name, note } });
     }
 
     function toggleResident(id) {
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
             appData = res.data;
             renderDashboard();
             showToast('Status penghuni diperbarui');
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal', true);
           }
         })
         .handleAction({ action: 'toggleResident', pin: adminPin, data: { id } });
     }
 
+    function deleteResident(id, name) {
+      if (!confirm(`Hapus permanen penghuni "${name}" (${id})?`)) return;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res && res.ok) {
+            if (document.getElementById('editResId').value === id) cancelEditResident();
+            appData = res.data;
+            renderDashboard();
+            showToast(`Penghuni ${name} dihapus`);
+          } else {
+            showToast(res ? res.error : 'Gagal', true);
+          }
+        })
+        .handleAction({ action: 'deleteResident', pin: adminPin, data: { id } });
+    }
+
+    // Piket Actions
     function generatePiket() {
       const count = document.getElementById('piketCount').value || 2;
       const dayName = prompt('Hari pelaksanaan piket minggu ini (misal: Minggu atau Jumat Malam):', 'Minggu');
       if (!dayName) return;
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
             appData = res.data;
             renderDashboard();
             showToast('Petugas piket berhasil diacak!');
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal', true);
           }
         })
         .handleAction({ action: 'generateWeeklyPiket', pin: adminPin, data: { count, dayName } });
@@ -368,12 +572,12 @@
       if (!dayName) return;
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
             appData = res.data;
             renderDashboard();
             showToast(`Hari piket diganti ke ${dayName}`);
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal', true);
           }
         })
         .handleAction({ action: 'updatePiketDay', pin: adminPin, data: { dayName } });
@@ -383,12 +587,12 @@
       if (!confirm('Tandai piket minggu ini sudah Selesai?')) return;
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
             appData = res.data;
             renderDashboard();
             showToast('Piket minggu ini ditandai Selesai!');
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal', true);
           }
         })
         .handleAction({ action: 'markPiketDone', pin: adminPin, data: {} });
@@ -397,31 +601,68 @@
     function swapPiket() {
       const oldName = prompt('Siapa yang berhalangan / mau tuker?');
       if (!oldName) return;
-      const newName = prompt(`Diganti oleh siapa?`);
+      const newName = prompt('Diganti oleh siapa?');
       if (!newName) return;
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
             appData = res.data;
             renderDashboard();
             showToast(`Piket ${oldName} ditukar dengan ${newName}`);
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal', true);
           }
         })
         .handleAction({ action: 'swapPiketMember', pin: adminPin, data: { oldName: oldName.trim(), newName: newName.trim() } });
     }
 
+    // CRUD Transaksi Buku Kas
+    function startEditTrx(id) {
+      const trx = (appData?.transactions || []).find(t => t.id === id);
+      if (!trx) return;
+      editingTrxId = id;
+      setTrxType(trx.type);
+      document.getElementById('trxDate').value = trx.date || new Date().toISOString().slice(0, 10);
+      document.getElementById('trxCategory').value = trx.category;
+      document.getElementById('trxDesc').value = trx.description;
+      document.getElementById('trxQty').value = trx.qty || '';
+      document.getElementById('trxNominal').value = Number(trx.nominal || 0).toLocaleString('id-ID');
+      document.getElementById('trxProof').value = '';
+      document.getElementById('trxRemoveProof').checked = false;
+
+      document.getElementById('editBannerText').textContent = `Mode Edit: ${trx.id} — ${trx.description}`;
+      document.getElementById('editBanner').classList.remove('hidden');
+      document.getElementById('btnSubmitTrx').textContent = 'Simpan Perubahan';
+      if (trx.proofUrl) {
+        document.getElementById('removeProofWrap').classList.remove('hidden');
+        document.getElementById('removeProofWrap').classList.add('flex');
+      } else {
+        document.getElementById('removeProofWrap').classList.add('hidden');
+      }
+      document.getElementById('adminPanel').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function cancelEditTrx() {
+      editingTrxId = null;
+      document.getElementById('trxForm').reset();
+      document.getElementById('trxDate').value = new Date().toISOString().slice(0, 10);
+      setTrxType('Pengeluaran');
+      document.getElementById('editBanner').classList.add('hidden');
+      document.getElementById('removeProofWrap').classList.add('hidden');
+      document.getElementById('btnSubmitTrx').textContent = 'Tambah';
+    }
+
     function deleteTrx(id) {
-      if (!confirm(`Hapus transaksi ${id}?`)) return;
+      if (!confirm(`Hapus transaksi ${id} beserta foto buktinya?`)) return;
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
+            if (editingTrxId === id) cancelEditTrx();
             appData = res.data;
             renderDashboard();
             showToast('Transaksi dihapus');
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal', true);
           }
         })
         .handleAction({ action: 'deleteTransaction', pin: adminPin, data: { id } });
@@ -429,7 +670,8 @@
 
     async function submitTransaction(e) {
       e.preventDefault();
-      const btn = e.target.querySelector('button[type="submit"]');
+      const btn = document.getElementById('btnSubmitTrx');
+      const defaultLabel = editingTrxId ? 'Simpan Perubahan' : 'Tambah';
       btn.disabled = true;
       btn.textContent = 'Menyimpan...';
       try {
@@ -437,48 +679,74 @@
         const file = fileInput.files[0];
         let proof = null;
         if (file) {
-          if (file.size > 2 * 1024 * 1024) {
-            return showToast('Ukuran gambar maksimal 2 MB', true);
+          if (file.size > 15 * 1024 * 1024) {
+            btn.disabled = false;
+            btn.textContent = defaultLabel;
+            return showToast('Ukuran foto mentah maksimal 15 MB', true);
           }
-          const base64 = await readFileAsBase64(file);
-          proof = { base64, mimeType: file.type, fileName: file.name };
+          btn.textContent = 'Mengompres foto...';
+          proof = await compressImage(file);
+          btn.textContent = 'Menyimpan...';
         }
 
+        const isEdit = Boolean(editingTrxId);
         const payload = {
-          action: 'addTransaction',
+          action: isEdit ? 'updateTransaction' : 'addTransaction',
           pin: adminPin,
           data: {
+            id: editingTrxId,
+            date: document.getElementById('trxDate').value,
             type: document.getElementById('trxType').value,
             category: document.getElementById('trxCategory').value,
             description: document.getElementById('trxDesc').value,
+            qty: document.getElementById('trxQty').value,
             nominal: document.getElementById('trxNominal').value.replace(/\D/g, ''),
             proof,
+            removeProof: isEdit ? document.getElementById('trxRemoveProof').checked : false,
           },
         };
         google.script.run
           .withSuccessHandler((res) => {
             btn.disabled = false;
-            btn.textContent = '+ Catat Transaksi';
-            if (res.ok) {
+            if (res && res.ok) {
               appData = res.data;
-              document.getElementById('trxForm').reset();
+              cancelEditTrx();
               renderDashboard();
-              showToast('Transaksi berhasil dicatat');
+              showToast(isEdit ? 'Transaksi diperbarui' : 'Transaksi ditambahkan');
             } else {
-              showToast(res.error, true);
+              btn.textContent = defaultLabel;
+              showToast(res ? res.error : 'Gagal memuat respons server', true);
             }
           })
           .withFailureHandler((err) => {
             btn.disabled = false;
-            btn.textContent = '+ Catat Transaksi';
+            btn.textContent = defaultLabel;
             showToast('Gagal: ' + err.message, true);
           })
           .handleAction(payload);
       } catch (err) {
         btn.disabled = false;
-        btn.textContent = '+ Catat Transaksi';
+        btn.textContent = defaultLabel;
         showToast('Error: ' + err.message, true);
       }
+    }
+
+    function linkSpreadsheet() {
+      const spreadsheetUrl = document.getElementById('inputSheetUrl').value.trim();
+      if (!spreadsheetUrl) return showToast('Masukkan link Google Sheet terlebih dahulu', true);
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res && res.ok) {
+            appData = res.data;
+            document.getElementById('inputSheetUrl').value = '';
+            renderDashboard();
+            showToast('Google Sheet berhasil dihubungkan & 5 tab dibuat!');
+          } else {
+            showToast(res ? res.error : 'Gagal menghubungkan sheet', true);
+          }
+        })
+        .withFailureHandler((err) => showToast('Gagal: ' + err.message, true))
+        .handleAction({ action: 'linkSpreadsheet', pin: adminPin, data: { spreadsheetUrl } });
     }
 
     function copyPaymentInfo() {
@@ -491,12 +759,12 @@
       const paymentInfo = document.getElementById('inputPaymentInfo').value;
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
             appData = res.data;
             renderDashboard();
             showToast('Info rekening berhasil disimpan');
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal', true);
           }
         })
         .handleAction({ action: 'updatePaymentInfo', pin: adminPin, data: { paymentInfo } });
@@ -506,12 +774,12 @@
       const amount = document.getElementById('inputDuesAmount').value;
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
             appData = res.data;
             renderDashboard();
             showToast('Tarif iuran berhasil diperbarui');
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal', true);
           }
         })
         .handleAction({ action: 'updateDuesAmount', pin: adminPin, data: { amount } });
@@ -523,12 +791,12 @@
       if (!confirm(`Verifikasi iuran ${residentName} untuk bulan ${monthYear} (${fmtRp(amount)})?`)) return;
       google.script.run
         .withSuccessHandler((res) => {
-          if (res.ok) {
+          if (res && res.ok) {
             appData = res.data;
             renderDashboard();
             showToast(`Iuran ${residentName} lunas!`);
           } else {
-            showToast(res.error, true);
+            showToast(res ? res.error : 'Gagal', true);
           }
         })
         .handleAction({ action: 'markDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear, amount } });
@@ -549,7 +817,7 @@
 
     function exportCsv() {
       const rows = [['ID', 'Tanggal', 'Tipe', 'Kategori', 'Keterangan', 'Qty', 'Nominal']];
-      appData.transactions.forEach(t => rows.push([t.id, t.date, t.type, t.category, `"${t.description}"`, t.qty, t.nominal]));
+      appData.transactions.forEach(t => rows.push([t.id, t.date, t.type, t.category, `"${t.description}"`, t.qty || '', t.nominal]));
       const csv = rows.map(r => r.join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
       const a = document.createElement('a');

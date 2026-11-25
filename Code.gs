@@ -27,14 +27,20 @@ function getCategories_() {
   return saved ? JSON.parse(saved) : ['Token Listrik', 'Air Galon', 'Gas', 'Kebersihan', 'Lainnya'];
 }
 
-/**
- * Jalankan fungsi ini SEKALI saja dari Apps Script Editor untuk membuat
- * 4 tab database beserta header dan data awal.
- */
-function setupDatabase() {
-  DriveApp.getRootFolder(); // Memastikan izin Google Drive aktif untuk upload foto
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+function getSpreadsheet_() {
+  const props = PropertiesService.getScriptProperties();
+  const savedId = props.getProperty('SPREADSHEET_ID');
+  if (savedId) {
+    const m = savedId.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    const cleanId = m ? m[1] : savedId.trim();
+    return SpreadsheetApp.openById(cleanId);
+  }
+  const active = SpreadsheetApp.getActiveSpreadsheet();
+  if (active) return active;
+  throw new Error('Spreadsheet belum terhubung! Isi SPREADSHEET_ID (link Google Sheet) di Properti Skrip atau buka dari menu Extensions > Apps Script di dalam Google Sheet.');
+}
 
+function ensureSheets_(ss) {
   // 1. Master_Penghuni
   let resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
   if (!resSheet) {
@@ -72,7 +78,6 @@ function setupDatabase() {
     ledgerSheet = ss.insertSheet(SHEET_NAMES.LEDGER);
     ledgerSheet.appendRow(['ID_Trx', 'Tanggal', 'Tipe', 'Kategori', 'Keterangan', 'Qty', 'Nominal', 'Dicatat_Oleh', 'Bukti_URL']);
     ledgerSheet.getRange('A1:I1').setFontWeight('bold').setBackground('#e2e8f0');
-    // Saldo awal cutoff (sesuaikan jika perlu)
     ledgerSheet.appendRow(['TRX-000', '2026-11-01', 'Pemasukan', 'Saldo Awal', 'Saldo Awal Cutoff Migrasi', 1, 591600, 'System', '']);
   }
 
@@ -92,8 +97,18 @@ function setupDatabase() {
     auditSheet.appendRow(['Timestamp', 'Aktor', 'Aksi', 'Detail']);
     auditSheet.getRange('A1:D1').setFontWeight('bold').setBackground('#fee2e2');
   }
+}
 
-  logAudit('System', 'SETUP_DB', 'Inisialisasi 4 tab database FortMess');
+/**
+ * Jalankan fungsi ini SEKALI saja dari Apps Script Editor untuk memastikan
+ * izin Google Drive & Sheets aktif serta 5 tab database dibuat.
+ */
+function setupDatabase() {
+  DriveApp.getRootFolder(); // Memastikan izin Google Drive aktif untuk upload foto
+  const ss = getSpreadsheet_();
+  ensureSheets_(ss);
+  Logger.log('Database siap di Spreadsheet: ' + ss.getName() + ' -> ' + ss.getUrl());
+  logAudit('System', 'SETUP_DB', 'Inisialisasi tab database FortMess di ' + ss.getName());
 }
 
 /**
@@ -152,14 +167,29 @@ function uploadProofImage_(proof, dateStr) {
   const blob = Utilities.newBlob(bytes, proof.mimeType, proof.fileName || `bukti-${Date.now()}.jpg`);
   const file = monthFolder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return file.getUrl();
+  return `https://drive.google.com/file/d/${file.getId()}/view`;
+}
+
+function trashDriveFileByUrl_(url) {
+  if (!url) return;
+  const match = String(url).match(/\/d\/([a-zA-Z0-9_-]+)/) || String(url).match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (!match) return;
+  try {
+    DriveApp.getFileById(match[1]).setTrashed(true);
+  } catch (e) {
+    // Abaikan jika file sudah dihapus manual di Drive
+  }
 }
 
 function logAudit(actor, action, detail) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAMES.AUDIT);
-  if (sheet) {
-    sheet.appendRow([new Date().toISOString(), actor, action, String(detail)]);
+  try {
+    const ss = getSpreadsheet_();
+    const sheet = ss.getSheetByName(SHEET_NAMES.AUDIT);
+    if (sheet) {
+      sheet.appendRow([new Date().toISOString(), actor, action, String(detail)]);
+    }
+  } catch (e) {
+    // Abaikan jika spreadsheet belum di-link
   }
 }
 
@@ -216,11 +246,25 @@ function handleAction(payload) {
   try {
     lock.waitLock(10000);
     const actor = Session.getActiveUser().getEmail() || 'Admin_PIN';
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
 
     if (action === 'verifyAuth') {
       return { ok: true, message: 'Akses Bendahara aktif.' };
     }
+
+    if (action === 'linkSpreadsheet') {
+      const rawUrl = String(data.spreadsheetUrl || '').trim();
+      if (!rawUrl) return { ok: false, error: 'Link / ID Google Sheet wajib diisi.' };
+      const m = rawUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const cleanId = m ? m[1] : rawUrl;
+      const targetSs = SpreadsheetApp.openById(cleanId);
+      ensureSheets_(targetSs);
+      PropertiesService.getScriptProperties().setProperty('SPREADSHEET_ID', cleanId);
+      logAudit(actor, 'LINK_SHEET', `Spreadsheet dihubungkan ke ${targetSs.getName()}`);
+      return { ok: true, data: getDashboardData() };
+    }
+
+    const ss = getSpreadsheet_();
+    ensureSheets_(ss);
 
     if (action === 'updateDuesAmount') {
       const newAmount = Number(data.amount);
@@ -250,19 +294,68 @@ function handleAction(payload) {
 
     if (action === 'addResident') {
       const name = String(data.name || '').trim();
+      const note = String(data.note || '').trim();
       if (!name) return { ok: false, error: 'Nama penghuni wajib diisi.' };
       const resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
-      const id = 'R' + String(resSheet.getLastRow()).padStart(2, '0');
-      resSheet.appendRow([id, name, 'Aktif', new Date().toISOString().slice(0, 10), '']);
+      const rows = resSheet.getDataRange().getValues().slice(1);
+      let maxNum = 0;
+      rows.forEach(r => {
+        const m = String(r[0] || '').match(/\d+/);
+        if (m) maxNum = Math.max(maxNum, Number(m[0]));
+      });
+      const id = 'R' + String(maxNum + 1).padStart(2, '0');
+      resSheet.appendRow([id, name, 'Aktif', new Date().toISOString().slice(0, 10), note]);
       logAudit(actor, 'ADD_RESIDENT', `Tambah penghuni: ${name} (${id})`);
       return { ok: true, data: getDashboardData() };
+    }
+
+    if (action === 'updateResident') {
+      const name = String(data.name || '').trim();
+      const note = String(data.note || '').trim();
+      if (!name) return { ok: false, error: 'Nama penghuni wajib diisi.' };
+      const resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
+      const rows = resSheet.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]) === String(data.id)) {
+          const oldName = rows[i][1];
+          resSheet.getRange(i + 1, 2).setValue(name);
+          resSheet.getRange(i + 1, 5).setValue(note);
+          // Sinkronkan nama di Matriks_Iuran
+          const duesSheet = ss.getSheetByName(SHEET_NAMES.DUES);
+          if (duesSheet && duesSheet.getLastRow() >= 2) {
+            const dRows = duesSheet.getDataRange().getValues();
+            for (let j = 1; j < dRows.length; j++) {
+              if (String(dRows[j][0]) === String(data.id)) {
+                duesSheet.getRange(j + 1, 2).setValue(name);
+              }
+            }
+          }
+          logAudit(actor, 'UPDATE_RESIDENT', `Edit penghuni ${data.id}: ${oldName} -> ${name}`);
+          return { ok: true, data: getDashboardData() };
+        }
+      }
+      return { ok: false, error: 'Penghuni tidak ditemukan.' };
+    }
+
+    if (action === 'deleteResident') {
+      const resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
+      const rows = resSheet.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]) === String(data.id)) {
+          const deletedName = rows[i][1];
+          resSheet.deleteRow(i + 1);
+          logAudit(actor, 'DELETE_RESIDENT', `Hapus penghuni ${data.id}: ${deletedName}`);
+          return { ok: true, data: getDashboardData() };
+        }
+      }
+      return { ok: false, error: 'Penghuni tidak ditemukan.' };
     }
 
     if (action === 'toggleResident') {
       const resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
       const rows = resSheet.getDataRange().getValues();
       for (let i = 1; i < rows.length; i++) {
-        if (rows[i][0] === data.id) {
+        if (String(rows[i][0]) === String(data.id)) {
           const newStatus = rows[i][2] === 'Aktif' ? 'Non-Aktif' : 'Aktif';
           resSheet.getRange(i + 1, 3).setValue(newStatus);
           logAudit(actor, 'TOGGLE_RESIDENT', `${rows[i][1]} -> ${newStatus}`);
@@ -275,7 +368,7 @@ function handleAction(payload) {
     if (action === 'addTransaction') {
       const sheet = ss.getSheetByName(SHEET_NAMES.LEDGER);
       const id = 'TRX-' + Date.now().toString().slice(-6);
-      const qty = Number(data.qty) || 1;
+      const qty = data.qty !== '' && data.qty != null ? Math.max(Number(data.qty) || 1, 1) : '';
       const nominal = Number(data.nominal) || 0;
       if (nominal <= 0) return { ok: false, error: 'Nominal harus lebih dari 0.' };
 
@@ -297,11 +390,49 @@ function handleAction(payload) {
       return { ok: true, data: getDashboardData() };
     }
 
+    if (action === 'updateTransaction') {
+      const sheet = ss.getSheetByName(SHEET_NAMES.LEDGER);
+      const rows = sheet.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]) === String(data.id)) {
+          const qty = data.qty !== '' && data.qty != null ? Math.max(Number(data.qty) || 1, 1) : '';
+          const nominal = Number(data.nominal) || 0;
+          if (nominal <= 0) return { ok: false, error: 'Nominal harus lebih dari 0.' };
+
+          const trxDate = data.date || fmtDate_(rows[i][1]) || new Date().toISOString().slice(0, 10);
+          let proofUrl = String(rows[i][8] || '');
+
+          if (data.proof && data.proof.base64) {
+            trashDriveFileByUrl_(proofUrl);
+            proofUrl = uploadProofImage_(data.proof, trxDate);
+          } else if (data.removeProof) {
+            trashDriveFileByUrl_(proofUrl);
+            proofUrl = '';
+          }
+
+          sheet.getRange(i + 1, 2, 1, 8).setValues([[
+            trxDate,
+            data.type || 'Pengeluaran',
+            data.category || 'Lainnya',
+            data.description || '-',
+            qty,
+            nominal,
+            actor,
+            proofUrl,
+          ]]);
+          logAudit(actor, 'UPDATE_TRX', `Edit ${data.id}: ${data.description} (${nominal})`);
+          return { ok: true, data: getDashboardData() };
+        }
+      }
+      return { ok: false, error: 'Transaksi tidak ditemukan.' };
+    }
+
     if (action === 'deleteTransaction') {
       const sheet = ss.getSheetByName(SHEET_NAMES.LEDGER);
       const rows = sheet.getDataRange().getValues();
       for (let i = 1; i < rows.length; i++) {
-        if (rows[i][0] === data.id) {
+        if (String(rows[i][0]) === String(data.id)) {
+          trashDriveFileByUrl_(rows[i][8]);
           sheet.deleteRow(i + 1);
           logAudit(actor, 'DELETE_TRX', `Hapus transaksi ${data.id}: ${rows[i][4]} (${rows[i][6]})`);
           return { ok: true, data: getDashboardData() };
@@ -318,7 +449,7 @@ function handleAction(payload) {
       const payAmount = Number(amount) || getDuesAmount_();
 
       for (let i = 1; i < rows.length; i++) {
-        if (rows[i][0] === residentId && rows[i][2] === monthYear && rows[i][4] === 'Lunas') {
+        if (String(rows[i][0]) === String(residentId) && fmtMonth_(rows[i][2]) === monthYear && rows[i][4] === 'Lunas') {
           return { ok: false, error: `Iuran ${residentName} bulan ${monthYear} sudah tercatat Lunas.` };
         }
       }
@@ -419,60 +550,80 @@ function handleAction(payload) {
   }
 }
 
+function fmtDate_(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone() || 'Asia/Jakarta', 'yyyy-MM-dd');
+  }
+  return v == null ? '' : String(v);
+}
+
+function fmtMonth_(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone() || 'Asia/Jakarta', 'yyyy-MM');
+  }
+  return v == null ? '' : String(v).slice(0, 7);
+}
+
 /**
  * Mengambil seluruh data dashboard (Read-Only)
  */
 function getDashboardData() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const resRows = ss.getSheetByName(SHEET_NAMES.RESIDENTS).getDataRange().getValues();
-  const duesRows = ss.getSheetByName(SHEET_NAMES.DUES).getDataRange().getValues();
-  const ledgerRows = ss.getSheetByName(SHEET_NAMES.LEDGER).getDataRange().getValues();
+  const ss = getSpreadsheet_();
+  ensureSheets_(ss);
+  const resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
+  const duesSheet = ss.getSheetByName(SHEET_NAMES.DUES);
+  const ledgerSheet = ss.getSheetByName(SHEET_NAMES.LEDGER);
 
-  const residents = resRows.slice(1).map(r => ({
-    id: r[0],
-    name: r[1],
-    status: r[2],
-    joinedAt: r[3],
+  const resRows = resSheet ? resSheet.getDataRange().getValues() : [];
+  const duesRows = duesSheet ? duesSheet.getDataRange().getValues() : [];
+  const ledgerRows = ledgerSheet ? ledgerSheet.getDataRange().getValues() : [];
+
+  const residents = resRows.slice(1).filter(r => r[0]).map(r => ({
+    id: String(r[0]),
+    name: String(r[1] || ''),
+    status: String(r[2] || 'Aktif'),
+    joinedAt: fmtDate_(r[3]),
+    note: String(r[4] || ''),
   }));
 
-  const dues = duesRows.slice(1).map(r => ({
-    residentId: r[0],
-    name: r[1],
-    month: r[2],
+  const dues = duesRows.slice(1).filter(r => r[0]).map(r => ({
+    residentId: String(r[0]),
+    name: String(r[1] || ''),
+    month: fmtMonth_(r[2]),
     amount: Number(r[3]) || 0,
-    status: r[4],
-    paidAt: r[5],
+    status: String(r[4] || ''),
+    paidAt: fmtDate_(r[5]),
   }));
 
   let totalIncome = 0;
   let totalExpense = 0;
-  const transactions = ledgerRows.slice(1).map(r => {
-    const type = r[2];
+  const transactions = ledgerRows.slice(1).filter(r => r[0]).map(r => {
+    const type = String(r[2] || 'Pengeluaran');
     const nominal = Number(r[6]) || 0;
     if (type === 'Pemasukan') totalIncome += nominal;
     else totalExpense += nominal;
     return {
-      id: r[0],
-      date: r[1] instanceof Date ? r[1].toISOString().slice(0, 10) : String(r[1]),
+      id: String(r[0]),
+      date: fmtDate_(r[1]),
       type,
-      category: r[3],
-      description: r[4],
-      qty: Number(r[5]) || 1,
+      category: String(r[3] || 'Lainnya'),
+      description: String(r[4] || '-'),
+      qty: r[5] !== '' && r[5] != null ? Number(r[5]) : null,
       nominal,
-      proofUrl: r[8] || '',
+      proofUrl: String(r[8] || ''),
     };
   }).reverse();
 
   const piketSheet = ss.getSheetByName(SHEET_NAMES.PIKET);
-  const piket = piketSheet ? piketSheet.getDataRange().getValues().slice(1).map(r => ({
-    week: r[0],
-    day: r[1],
-    assignees: r[2],
-    status: r[3],
-    note: r[4] || '',
+  const piket = piketSheet ? piketSheet.getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({
+    week: String(r[0] || ''),
+    day: String(r[1] || ''),
+    assignees: String(r[2] || ''),
+    status: String(r[3] || ''),
+    note: String(r[4] || ''),
   })) : [];
 
-  return {
+  const result = {
     summary: {
       balance: totalIncome - totalExpense,
       totalIncome,
@@ -481,10 +632,14 @@ function getDashboardData() {
       duesAmount: getDuesAmount_(),
       paymentInfo: getPaymentInfo_(),
       categories: getCategories_(),
+      spreadsheetName: ss.getName(),
+      spreadsheetUrl: ss.getUrl(),
     },
     residents,
     dues,
     transactions,
     piket,
   };
+
+  return JSON.parse(JSON.stringify(result));
 }
