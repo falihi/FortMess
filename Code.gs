@@ -95,7 +95,17 @@ function ensureSheets_(ss) {
     ledgerSheet.appendRow(['ID_Trx', 'Tanggal', 'Tipe', 'Kategori', 'Keterangan', 'Qty', 'Nominal', 'Dicatat_Oleh', 'Bukti_URL']);
     ledgerSheet.getRange('A1:I1').setFontWeight('bold').setBackground('#e2e8f0');
     ledgerSheet.getRange('A:B').setNumberFormat('@');
-    ledgerSheet.appendRow(['TRX-000', '2026-11-01', 'Pemasukan', 'Saldo Awal', 'Saldo Awal Cutoff Migrasi', 1, 591600, 'System', '']);
+    const initialLedger = [
+      ['TRX-000', '2026-11-01', 'Pemasukan', 'Saldo Awal', 'Saldo Awal Kas November', 1, 591600, 'System', ''],
+      ['TRX-001', '2026-11-16', 'Pengeluaran', 'Kebersihan', 'Bersih-bersih (Topan)', '', 518300, 'System', ''],
+      ['TRX-002', '2026-11-16', 'Pengeluaran', 'Air Galon', 'Air Galon', 3, 27000, 'System', ''],
+      ['TRX-003', '2026-11-16', 'Pengeluaran', 'Gas', 'GAS', 2, 49000, 'System', ''],
+      ['TRX-004', '2026-11-17', 'Pengeluaran', 'Kebersihan', 'Sunlight Kilau Nipis', 1, 8500, 'System', ''],
+      ['TRX-005', '2026-11-17', 'Pengeluaran', 'Kebersihan', 'Spoon Cuci Piring', 1, 9700, 'System', ''],
+      ['TRX-006', '2026-11-19', 'Pengeluaran', 'Kebersihan', 'Stella Ruangan', 1, 39900, 'System', ''],
+      ['TRX-007', '2026-11-22', 'Pengeluaran', 'Air Galon', 'Air Galon', 3, 27000, 'System', ''],
+    ];
+    ledgerSheet.getRange(2, 1, initialLedger.length, 9).setValues(initialLedger);
   }
 
   // 4. Jadwal_Piket (Mingguan)
