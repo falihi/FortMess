@@ -28,6 +28,9 @@ function getCategories_() {
 }
 
 function getSpreadsheet_() {
+  const active = SpreadsheetApp.getActiveSpreadsheet();
+  if (active) return active;
+
   const props = PropertiesService.getScriptProperties();
   const savedId = props.getProperty('SPREADSHEET_ID');
   if (savedId) {
@@ -35,23 +38,16 @@ function getSpreadsheet_() {
       const m = savedId.match(/\/d\/([a-zA-Z0-9_-]+)/);
       const cleanId = m ? m[1] : savedId.trim();
       return SpreadsheetApp.openById(cleanId);
-    } catch (e) {
-      // Lanjut ke auto-discovery jika ID lama tidak valid
-    }
+    } catch (e) {}
   }
-  const active = SpreadsheetApp.getActiveSpreadsheet();
-  if (active) {
-    props.setProperty('SPREADSHEET_ID', active.getId());
-    return active;
-  }
-  // Auto-discovery: cari file 'Database Kas FortMess' di Google Drive
+
   const files = DriveApp.getFilesByName('Database Kas FortMess');
   if (files.hasNext()) {
     const file = files.next();
     props.setProperty('SPREADSHEET_ID', file.getId());
     return SpreadsheetApp.openById(file.getId());
   }
-  // Jika belum ada sama sekali, buat otomatis
+
   const created = SpreadsheetApp.create('Database Kas FortMess');
   props.setProperty('SPREADSHEET_ID', created.getId());
   return created;
@@ -642,78 +638,97 @@ function fmtMonth_(v) {
  * Mengambil seluruh data dashboard (Read-Only)
  */
 function getDashboardData() {
-  const ss = getSpreadsheet_();
-  ensureSheets_(ss);
-  const resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
-  const duesSheet = ss.getSheetByName(SHEET_NAMES.DUES);
-  const ledgerSheet = ss.getSheetByName(SHEET_NAMES.LEDGER);
+  try {
+    const ss = getSpreadsheet_();
+    ensureSheets_(ss);
+    const resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
+    const duesSheet = ss.getSheetByName(SHEET_NAMES.DUES);
+    const ledgerSheet = ss.getSheetByName(SHEET_NAMES.LEDGER);
 
-  const resRows = resSheet ? resSheet.getDataRange().getValues() : [];
-  const duesRows = duesSheet ? duesSheet.getDataRange().getValues() : [];
-  const ledgerRows = ledgerSheet ? ledgerSheet.getDataRange().getValues() : [];
+    const resRows = resSheet ? resSheet.getDataRange().getValues() : [];
+    const duesRows = duesSheet ? duesSheet.getDataRange().getValues() : [];
+    const ledgerRows = ledgerSheet ? ledgerSheet.getDataRange().getValues() : [];
 
-  const residents = resRows.slice(1).filter(r => r[0]).map(r => ({
-    id: String(r[0]),
-    name: String(r[1] || ''),
-    status: String(r[2] || 'Aktif'),
-    joinedAt: fmtDate_(r[3]),
-    note: String(r[4] || ''),
-  }));
-
-  const dues = duesRows.slice(1).filter(r => r[0]).map(r => ({
-    residentId: String(r[0]),
-    name: String(r[1] || ''),
-    month: fmtMonth_(r[2]),
-    amount: Number(r[3]) || 0,
-    status: String(r[4] || ''),
-    paidAt: fmtDate_(r[5]),
-  }));
-
-  let totalIncome = 0;
-  let totalExpense = 0;
-  const transactions = ledgerRows.slice(1).filter(r => r[0]).map(r => {
-    const type = String(r[2] || 'Pengeluaran');
-    const nominal = Number(r[6]) || 0;
-    if (type === 'Pemasukan') totalIncome += nominal;
-    else totalExpense += nominal;
-    return {
+    const residents = resRows.slice(1).filter(r => r[0]).map(r => ({
       id: String(r[0]),
-      date: fmtDate_(r[1]),
-      type,
-      category: String(r[3] || 'Lainnya'),
-      description: String(r[4] || '-'),
-      qty: r[5] !== '' && r[5] != null ? Number(r[5]) : null,
-      nominal,
-      proofUrl: String(r[8] || ''),
+      name: String(r[1] || ''),
+      status: String(r[2] || 'Aktif'),
+      joinedAt: fmtDate_(r[3]),
+      note: String(r[4] || ''),
+    }));
+
+    const dues = duesRows.slice(1).filter(r => r[0]).map(r => ({
+      residentId: String(r[0]),
+      name: String(r[1] || ''),
+      month: fmtMonth_(r[2]),
+      amount: Number(r[3]) || 0,
+      status: String(r[4] || ''),
+      paidAt: fmtDate_(r[5]),
+    }));
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+    const transactions = ledgerRows.slice(1).filter(r => r[0]).map(r => {
+      const type = String(r[2] || 'Pengeluaran');
+      const nominal = Number(r[6]) || 0;
+      if (type === 'Pemasukan') totalIncome += nominal;
+      else totalExpense += nominal;
+      return {
+        id: String(r[0]),
+        date: fmtDate_(r[1]),
+        type,
+        category: String(r[3] || 'Lainnya'),
+        description: String(r[4] || '-'),
+        qty: r[5] !== '' && r[5] != null ? Number(r[5]) : null,
+        nominal,
+        proofUrl: String(r[8] || ''),
+      };
+    }).reverse();
+
+    const piketSheet = ss.getSheetByName(SHEET_NAMES.PIKET);
+    const piket = piketSheet ? piketSheet.getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({
+      week: String(r[0] || ''),
+      day: String(r[1] || ''),
+      assignees: String(r[2] || ''),
+      status: String(r[3] || ''),
+      note: String(r[4] || ''),
+    })) : [];
+
+    const result = {
+      summary: {
+        balance: totalIncome - totalExpense,
+        totalIncome,
+        totalExpense,
+        activeResidents: residents.filter(r => r.status === 'Aktif').length,
+        duesAmount: getDuesAmount_(),
+        paymentInfo: getPaymentInfo_(),
+        categories: getCategories_(),
+        spreadsheetName: ss.getName(),
+        spreadsheetUrl: ss.getUrl(),
+      },
+      residents,
+      dues,
+      transactions,
+      piket,
     };
-  }).reverse();
 
-  const piketSheet = ss.getSheetByName(SHEET_NAMES.PIKET);
-  const piket = piketSheet ? piketSheet.getDataRange().getValues().slice(1).filter(r => r[0]).map(r => ({
-    week: String(r[0] || ''),
-    day: String(r[1] || ''),
-    assignees: String(r[2] || ''),
-    status: String(r[3] || ''),
-    note: String(r[4] || ''),
-  })) : [];
-
-  const result = {
-    summary: {
-      balance: totalIncome - totalExpense,
-      totalIncome,
-      totalExpense,
-      activeResidents: residents.filter(r => r.status === 'Aktif').length,
-      duesAmount: getDuesAmount_(),
-      paymentInfo: getPaymentInfo_(),
-      categories: getCategories_(),
-      spreadsheetName: ss.getName(),
-      spreadsheetUrl: ss.getUrl(),
-    },
-    residents,
-    dues,
-    transactions,
-    piket,
-  };
-
-  return JSON.parse(JSON.stringify(result));
+    return JSON.parse(JSON.stringify(result));
+  } catch (err) {
+    return {
+      error: err.message,
+      summary: {
+        balance: 0,
+        totalIncome: 0,
+        totalExpense: 0,
+        activeResidents: 0,
+        duesAmount: getDuesAmount_(),
+        paymentInfo: getPaymentInfo_(),
+        categories: getCategories_(),
+      },
+      residents: [],
+      dues: [],
+      transactions: [],
+      piket: [],
+    };
+  }
 }

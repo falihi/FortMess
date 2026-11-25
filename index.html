@@ -21,24 +21,31 @@
         </div>
         <p id="headerSubtitle" class="text-xs text-stone-300">Transparansi Kas & Iuran Bulanan (jatuh tempo tgl 30)</p>
       </div>
-      <div class="flex items-center gap-2.5">
+      <div class="flex flex-wrap items-center gap-2">
         <span id="roleBadge" class="text-xs px-3 py-1.5 rounded-full bg-white/10 text-stone-200 font-medium border border-white/10">Mode: Penghuni</span>
-        <button id="btnAdminAuth" onclick="promptAdminPin()" class="text-xs px-4 py-1.5 rounded-full bg-emerald-500 text-stone-950 font-semibold hover:bg-emerald-400 transition">
+        <button id="btnAdminAuth" type="button" onclick="togglePinBox()" class="text-xs px-4 py-1.5 rounded-full bg-emerald-500 text-stone-950 font-semibold hover:bg-emerald-400 transition">
           Login Bendahara
         </button>
+        <!-- Inline PIN Input (Anti-Blokir Popup Chrome) -->
+        <form id="pinLoginForm" onsubmit="submitPinLogin(event)" class="hidden flex items-center gap-1.5">
+          <input id="inputAdminPin" type="password" placeholder="PIN Bendahara..." class="w-32 px-3 py-1.5 text-xs rounded-full bg-white text-stone-900 focus:outline-none" />
+          <button id="btnPinSubmit" type="submit" class="text-xs px-3.5 py-1.5 rounded-full bg-emerald-500 text-stone-950 font-semibold hover:bg-emerald-400">Masuk</button>
+          <button type="button" onclick="togglePinBox()" class="text-xs px-2 py-1 text-stone-400 hover:text-white">✕</button>
+        </form>
       </div>
     </header>
 
     <!-- Toast Notification -->
     <div id="toast" class="hidden fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition"></div>
 
-    <!-- Loading State -->
-    <div id="loadingState" class="bg-white p-8 rounded-2xl border border-stone-200 text-center text-stone-500 text-sm">
-      Memuat data kas dari Google Sheets...
+    <!-- Status Banner -->
+    <div id="loadingState" class="bg-amber-50 px-4 py-3 rounded-2xl border border-amber-200 text-amber-900 text-xs flex items-center justify-between">
+      <span id="loadingText">⏳ Menyinkronkan data dari Google Sheets...</span>
+      <button type="button" onclick="loadData()" class="px-2.5 py-1 rounded-lg bg-white border border-amber-300 font-medium hover:bg-amber-100">Muat Ulang</button>
     </div>
 
-    <!-- Main Content -->
-    <main id="mainContent" class="hidden space-y-5">
+    <!-- Main Content (Selalu tampil, tidak pernah terjebak hidden) -->
+    <main id="mainContent" class="space-y-5">
       <!-- Summary Cards -->
       <section class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
         <div class="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-sm">
@@ -61,35 +68,40 @@
           <p class="text-xs font-medium text-stone-500">Rekening Pembayaran Iuran</p>
           <p id="valPaymentInfo" class="text-sm font-bold text-stone-900 mt-0.5">-</p>
         </div>
-        <button onclick="copyPaymentInfo()" class="text-xs px-3.5 py-2 rounded-xl border border-stone-200 hover:bg-stone-100 font-medium self-start sm:self-center">
+        <button type="button" onclick="copyPaymentInfo()" class="text-xs px-3.5 py-2 rounded-xl border border-stone-200 hover:bg-stone-100 font-medium self-start sm:self-center">
           Copy No. Rekening
         </button>
       </section>
 
-      <!-- Pengaturan Bendahara (Tarif & Rekening) -->
+      <!-- Pengaturan Bendahara (Tarif, Rekening, Kategori) -->
       <section id="adminSettingsPanel" class="hidden bg-white p-5 rounded-2xl border border-stone-200/90 shadow-sm space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 class="text-sm font-bold text-stone-900">Pengaturan Bendahara</h2>
             <p id="sheetInfoText" class="text-xs text-stone-500 mt-0.5">Mengecek koneksi Google Sheet...</p>
           </div>
-          <button onclick="copyWaReminder()" class="text-xs px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700">
+          <button type="button" onclick="copyWaReminder()" class="text-xs px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700">
             Copy Rekap WA
           </button>
         </div>
         <div class="flex gap-2">
           <input id="inputSheetUrl" type="text" placeholder="Paste link Google Sheet jika ingin ganti/hubungkan manual..." class="flex-1 px-3.5 py-2 text-xs rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:border-stone-500" />
-          <button onclick="linkSpreadsheet()" class="px-3.5 py-2 text-xs font-semibold rounded-xl border border-stone-300 bg-white hover:bg-stone-100">Hubungkan Sheet</button>
+          <button type="button" onclick="linkSpreadsheet()" class="px-3.5 py-2 text-xs font-semibold rounded-xl border border-stone-300 bg-white hover:bg-stone-100">Hubungkan Sheet</button>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div class="flex gap-2">
             <input id="inputDuesAmount" type="number" min="1000" placeholder="Tarif Iuran (Rp)" class="flex-1 px-3.5 py-2 text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:border-stone-500" />
-            <button onclick="updateDuesAmount()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-stone-900 text-white hover:bg-stone-800">Simpan Tarif</button>
+            <button type="button" onclick="updateDuesAmount()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-stone-900 text-white hover:bg-stone-800">Simpan Tarif</button>
           </div>
           <div class="flex gap-2">
             <input id="inputPaymentInfo" type="text" placeholder="Contoh: BCA 1234567890 a.n. Falih" class="flex-1 px-3.5 py-2 text-sm rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:border-stone-500" />
-            <button onclick="updatePaymentInfo()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-stone-900 text-white hover:bg-stone-800">Simpan Rekening</button>
+            <button type="button" onclick="updatePaymentInfo()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-stone-900 text-white hover:bg-stone-800">Simpan Rekening</button>
           </div>
+        </div>
+        <!-- Inline Editor Kategori (Tanpa prompt popup) -->
+        <div id="categoryEditorBox" class="hidden flex gap-2 pt-1">
+          <input id="inputCategories" type="text" placeholder="Kategori dipisahkan koma (mis: Token Listrik, Air Galon, Gas)" class="flex-1 px-3.5 py-2 text-xs rounded-xl border border-stone-200 bg-stone-50/50 focus:bg-white focus:outline-none focus:border-stone-500" />
+          <button type="button" onclick="saveCategoriesInline()" class="px-3.5 py-2 text-xs font-semibold rounded-xl bg-stone-900 text-white hover:bg-stone-800">Simpan Kategori</button>
         </div>
       </section>
 
@@ -102,12 +114,12 @@
           </div>
 
           <!-- Toggle Pemasukan / Pengeluaran -->
-          <input type="hidden" id="trxType" value="Pemasukan" />
+          <input type="hidden" id="trxType" value="Pengeluaran" />
           <div class="grid grid-cols-2 gap-2.5">
-            <button type="button" id="btnTypeIn" onclick="setTrxType('Pemasukan')" class="py-2.5 rounded-xl text-sm font-semibold transition bg-stone-900 text-white">
+            <button type="button" id="btnTypeIn" onclick="setTrxType('Pemasukan')" class="py-2.5 rounded-xl text-sm font-medium transition bg-white text-stone-700 border border-stone-200 hover:bg-stone-50">
               Pemasukan
             </button>
-            <button type="button" id="btnTypeOut" onclick="setTrxType('Pengeluaran')" class="py-2.5 rounded-xl text-sm font-medium transition bg-white text-stone-700 border border-stone-200 hover:bg-stone-50">
+            <button type="button" id="btnTypeOut" onclick="setTrxType('Pengeluaran')" class="py-2.5 rounded-xl text-sm font-semibold transition bg-stone-900 text-white">
               Pengeluaran
             </button>
           </div>
@@ -129,7 +141,7 @@
                 <option value="Kebersihan">Kebersihan</option>
                 <option value="Lainnya">Lainnya</option>
               </select>
-              <button type="button" onclick="manageCategories()" class="px-3 py-2 text-xs rounded-xl border border-stone-200 bg-white hover:bg-stone-100" title="Kelola Kategori">⚙️</button>
+              <button type="button" onclick="toggleCategoryEditor()" class="px-3 py-2 text-xs rounded-xl border border-stone-200 bg-white hover:bg-stone-100" title="Kelola Kategori">⚙️</button>
             </div>
             <input id="trxDesc" type="text" placeholder="Keterangan (mis. Iuran Falih, Air galon)" required class="sm:col-span-2 w-full px-3.5 py-2.5 text-sm rounded-xl border border-stone-200 bg-stone-50/40 focus:bg-white focus:outline-none focus:border-stone-500" />
           </div>
@@ -155,13 +167,13 @@
         </form>
       </section>
 
-      <!-- Filter Bulan & Tabel Buku Kas (Sesuai Referensi UI) -->
+      <!-- Filter Bulan & Tabel Buku Kas -->
       <section class="space-y-3">
         <div class="flex items-center gap-2">
           <select id="ledgerMonthFilter" onchange="renderDashboard()" class="flex-1 px-4 py-3 text-sm rounded-xl border border-stone-200 bg-white shadow-sm focus:outline-none focus:border-stone-400">
             <option value="ALL">Semua bulan</option>
           </select>
-          <button onclick="exportCsv()" class="px-4 py-3 text-xs font-medium rounded-xl border border-stone-200 bg-white shadow-sm hover:bg-stone-50 shrink-0">
+          <button type="button" onclick="exportCsv()" class="px-4 py-3 text-xs font-medium rounded-xl border border-stone-200 bg-white shadow-sm hover:bg-stone-50 shrink-0">
             Export CSV
           </button>
         </div>
@@ -204,17 +216,24 @@
         <div id="residentsList" class="divide-y divide-stone-100 text-sm"></div>
       </section>
 
-      <!-- Jadwal Piket Mingguan -->
+      <!-- Jadwal Piket Mingguan (100% Inline, Tanpa prompt popup) -->
       <section class="bg-white p-5 rounded-2xl border border-stone-200/90 shadow-sm space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-sm font-bold text-stone-900">Jadwal Piket Mingguan</h2>
-          <div id="piketAdminBtns" class="hidden flex flex-wrap items-center gap-2">
-            <input id="piketCount" type="number" min="1" max="10" value="2" class="w-14 px-2.5 py-1 text-xs rounded-lg border border-stone-200" title="Jumlah orang" />
-            <button onclick="generatePiket()" class="text-xs px-3 py-1.5 rounded-lg bg-stone-900 text-white hover:bg-stone-800">Acak Petugas</button>
-            <button onclick="changePiketDay()" class="text-xs px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-50">Ganti Hari</button>
-            <button onclick="swapPiket()" class="text-xs px-3 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-50">Tukar Orang</button>
-            <button onclick="markPiketDone()" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Tandai Selesai</button>
+          <div id="piketAdminBtns" class="hidden flex flex-wrap items-center gap-1.5">
+            <input id="piketCount" type="number" min="1" max="10" value="2" class="w-12 px-2 py-1 text-xs rounded-lg border border-stone-200" title="Jumlah orang" />
+            <input id="piketDayInput" type="text" value="Minggu" placeholder="Hari (mis: Jumat Malam)" class="w-28 px-2.5 py-1 text-xs rounded-lg border border-stone-200" />
+            <button type="button" onclick="generatePiket()" class="text-xs px-3 py-1.5 rounded-lg bg-stone-900 text-white hover:bg-stone-800">Acak</button>
+            <button type="button" onclick="changePiketDay()" class="text-xs px-2.5 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-50">Set Hari</button>
+            <button type="button" onclick="toggleSwapBox()" class="text-xs px-2.5 py-1.5 rounded-lg border border-stone-200 hover:bg-stone-50">Tukar</button>
+            <button type="button" onclick="markPiketDone()" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">Selesai</button>
           </div>
+        </div>
+        <!-- Inline Tukar Piket -->
+        <div id="piketSwapBox" class="hidden flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-stone-50 border border-stone-200">
+          <input id="swapOldName" type="text" placeholder="Nama yang diganti..." class="flex-1 min-w-[120px] px-2.5 py-1.5 text-xs rounded-lg border border-stone-200 bg-white" />
+          <input id="swapNewName" type="text" placeholder="Nama pengganti..." class="flex-1 min-w-[120px] px-2.5 py-1.5 text-xs rounded-lg border border-stone-200 bg-white" />
+          <button type="button" onclick="swapPiket()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-stone-900 text-white">Simpan Tukar</button>
         </div>
         <div id="piketList" class="text-sm"></div>
       </section>
@@ -242,7 +261,7 @@
       el.textContent = msg;
       el.className = `fixed bottom-4 right-4 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white ${isError ? 'bg-rose-600' : 'bg-stone-900'}`;
       el.classList.remove('hidden');
-      setTimeout(() => el.classList.add('hidden'), 3000);
+      setTimeout(() => el.classList.add('hidden'), 3500);
     }
 
     function setTrxType(type) {
@@ -255,6 +274,54 @@
       btnOut.className = type === 'Pengeluaran' ? activeCls : idleCls;
     }
 
+    function togglePinBox() {
+      const form = document.getElementById('pinLoginForm');
+      const btn = document.getElementById('btnAdminAuth');
+      if (form.classList.contains('hidden')) {
+        form.classList.remove('hidden');
+        btn.classList.add('hidden');
+        document.getElementById('inputAdminPin').focus();
+      } else {
+        form.classList.add('hidden');
+        if (!adminPin) btn.classList.remove('hidden');
+      }
+    }
+
+    function submitPinLogin(e) {
+      e.preventDefault();
+      const pin = document.getElementById('inputAdminPin').value.trim();
+      if (!pin) return;
+      const btn = document.getElementById('btnPinSubmit');
+      btn.disabled = true;
+      btn.textContent = '...';
+      google.script.run
+        .withSuccessHandler((res) => {
+          btn.disabled = false;
+          btn.textContent = 'Masuk';
+          if (res && res.ok) {
+            adminPin = pin;
+            document.getElementById('pinLoginForm').classList.add('hidden');
+            document.getElementById('btnAdminAuth').classList.add('hidden');
+            document.getElementById('roleBadge').textContent = 'Mode: Bendahara';
+            document.getElementById('roleBadge').className = 'text-xs px-3 py-1.5 rounded-full bg-amber-400/20 text-amber-300 font-semibold border border-amber-400/30';
+            document.getElementById('adminSettingsPanel').classList.remove('hidden');
+            document.getElementById('adminPanel').classList.remove('hidden');
+            document.getElementById('residentForm').classList.remove('hidden');
+            document.getElementById('piketAdminBtns').classList.remove('hidden');
+            renderDashboard();
+            showToast('Login Bendahara berhasil');
+          } else {
+            showToast(res ? res.error : 'PIN salah', true);
+          }
+        })
+        .withFailureHandler((err) => {
+          btn.disabled = false;
+          btn.textContent = 'Masuk';
+          showToast('Error: ' + err.message, true);
+        })
+        .handleAction({ action: 'verifyAuth', pin });
+    }
+
     function init() {
       const todayIso = new Date().toISOString().slice(0, 10);
       document.getElementById('monthFilter').value = todayIso.slice(0, 7);
@@ -264,22 +331,33 @@
     }
 
     function loadData() {
+      const banner = document.getElementById('loadingState');
+      const text = document.getElementById('loadingText');
+      banner.classList.remove('hidden');
+      text.textContent = '⏳ Menyinkronkan data dari Google Sheets...';
+
       if (typeof google !== 'undefined' && google.script) {
         google.script.run
           .withSuccessHandler((res) => {
+            if (!res) {
+              text.textContent = '⚠️ Respons kosong dari server. Klik Muat Ulang.';
+              return;
+            }
             appData = res;
-            document.getElementById('loadingState').classList.add('hidden');
-            document.getElementById('mainContent').classList.remove('hidden');
+            if (res.error) {
+              text.textContent = '⚠️ ' + res.error;
+            } else {
+              banner.classList.add('hidden');
+            }
             renderDashboard();
           })
           .withFailureHandler((err) => {
-            document.getElementById('loadingState').classList.add('hidden');
-            document.getElementById('mainContent').classList.remove('hidden');
+            text.textContent = '⚠️ Gagal memuat: ' + err.message;
             showToast('Gagal memuat data: ' + err.message, true);
           })
           .getDashboardData();
       } else {
-        document.getElementById('loadingState').textContent = 'Jalankan melalui Google Apps Script Web App untuk terhubung ke Google Sheets.';
+        text.textContent = 'ℹ️ Buka melalui link Web App (/exec) untuk terhubung ke Google Sheets.';
       }
     }
 
@@ -296,6 +374,7 @@
       }
 
       const baseCats = summary.categories || ['Token Listrik', 'Air Galon', 'Gas', 'Kebersihan', 'Lainnya'];
+      document.getElementById('inputCategories').value = baseCats.join(', ');
       const cats = baseCats.includes('Iuran Bulanan') ? baseCats : ['Iuran Bulanan', ...baseCats];
       const prevCat = document.getElementById('trxCategory').value;
       document.getElementById('trxCategory').innerHTML = cats.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
@@ -315,7 +394,6 @@
         document.getElementById('thLedgerAction').classList.remove('hidden');
       }
 
-      // Hitung running balance kronologis (dari terlama ke terbaru)
       const chronological = [...transactions].reverse();
       let running = 0;
       const withBalance = chronological.map(t => {
@@ -349,8 +427,8 @@
           ${adminPin ? `
           <td class="py-3.5 px-4 text-right whitespace-nowrap">
             <div class="inline-flex items-center gap-1.5">
-              <button onclick="startEditTrx('${escHtml(t.id)}')" title="Edit" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">✎</button>
-              <button onclick="deleteTrx('${escHtml(t.id)}')" title="Hapus" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200">&times;</button>
+              <button type="button" onclick="startEditTrx('${escHtml(t.id)}')" title="Edit" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">✎</button>
+              <button type="button" onclick="deleteTrx('${escHtml(t.id)}')" title="Hapus" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200">&times;</button>
             </div>
           </td>` : ''}
         </tr>`;
@@ -359,7 +437,6 @@
       const colSpan = adminPin ? 6 : 5;
       document.getElementById('ledgerList').innerHTML = trxHtml || `<tr><td colspan="${colSpan}" class="py-8 text-center text-stone-400 text-xs">Belum ada transaksi pada periode ini.</td></tr>`;
 
-      // Render Daftar Penghuni
       const selectedMonth = document.getElementById('monthFilter').value;
       const visibleRes = adminPin ? residents : residents.filter(r => r.status === 'Aktif');
       const resHtml = visibleRes.map(r => {
@@ -373,21 +450,21 @@
             </div>
             <div class="flex flex-wrap items-center gap-1.5">
               ${isAktif ? `<span class="text-xs px-2.5 py-1 rounded-full font-medium ${paid ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">${paid ? 'Lunas' : 'Belum Bayar'}</span>` : ''}
-              ${(isAktif && !paid && adminPin) ? `<button onclick="markPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-3 py-1.5 rounded-lg bg-stone-900 text-white hover:bg-stone-800">Verifikasi</button>` : ''}
-              ${(isAktif && paid && adminPin) ? `<button onclick="unmarkPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-2.5 py-1.5 rounded-lg border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100">Batal Lunas</button>` : ''}
+              ${(isAktif && !paid && adminPin) ? `<button type="button" onclick="markPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-3 py-1.5 rounded-lg bg-stone-900 text-white hover:bg-stone-800">Verifikasi</button>` : ''}
+              ${(isAktif && paid && adminPin) ? `<button type="button" onclick="unmarkPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-2.5 py-1.5 rounded-lg border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100">Batal Lunas</button>` : ''}
               ${adminPin ? `
-                <button onclick="toggleResident('${escHtml(r.id)}')" class="text-xs px-2.5 py-1.5 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">${isAktif ? 'Non-Aktifkan' : 'Aktifkan'}</button>
-                <button onclick="startEditResident('${escHtml(r.id)}')" title="Edit Penghuni" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">✎</button>
-                <button onclick="deleteResident('${escHtml(r.id)}', '${escHtml(r.name)}')" title="Hapus Penghuni" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200">&times;</button>
+                <button type="button" onclick="toggleResident('${escHtml(r.id)}')" class="text-xs px-2.5 py-1.5 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">${isAktif ? 'Non-Aktifkan' : 'Aktifkan'}</button>
+                <button type="button" onclick="startEditResident('${escHtml(r.id)}')" title="Edit Penghuni" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">✎</button>
+                <button type="button" onclick="deleteResident('${escHtml(r.id)}', '${escHtml(r.name)}')" title="Hapus Penghuni" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200">&times;</button>
               ` : ''}
             </div>
           </div>`;
       }).join('');
       document.getElementById('residentsList').innerHTML = resHtml || '<p class="py-4 text-center text-stone-400 text-xs">Belum ada penghuni aktif.</p>';
 
-      // Render Piket
       const piket = (appData.piket || [])[0];
       if (piket) {
+        document.getElementById('piketDayInput').value = piket.day || 'Minggu';
         document.getElementById('piketList').innerHTML = `
           <div class="p-3.5 rounded-xl bg-stone-50 border border-stone-200/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
@@ -400,31 +477,6 @@
       } else {
         document.getElementById('piketList').innerHTML = '<p class="py-3 text-center text-stone-400 text-xs">Jadwal piket mingguan belum diatur.</p>';
       }
-    }
-
-    function promptAdminPin() {
-      const pin = prompt('Masukkan PIN Bendahara:');
-      if (!pin) return;
-      google.script.run
-        .withSuccessHandler((res) => {
-          if (res && res.ok) {
-            adminPin = pin;
-            document.getElementById('roleBadge').textContent = 'Mode: Bendahara';
-            document.getElementById('roleBadge').className = 'text-xs px-3 py-1.5 rounded-full bg-amber-400/20 text-amber-300 font-semibold border border-amber-400/30';
-            document.getElementById('loadingState').classList.add('hidden');
-            document.getElementById('mainContent').classList.remove('hidden');
-            document.getElementById('adminSettingsPanel').classList.remove('hidden');
-            document.getElementById('adminPanel').classList.remove('hidden');
-            document.getElementById('residentForm').classList.remove('hidden');
-            document.getElementById('piketAdminBtns').classList.remove('hidden');
-            document.getElementById('btnAdminAuth').classList.add('hidden');
-            renderDashboard();
-            showToast('Login Bendahara berhasil');
-          } else {
-            showToast(res ? res.error : 'Gagal verifikasi PIN', true);
-          }
-        })
-        .handleAction({ action: 'verifyAuth', pin });
     }
 
     function compressImage(file, maxDim = 1280, quality = 0.72) {
@@ -468,15 +520,23 @@
       el.value = digits ? Number(digits).toLocaleString('id-ID') : '';
     }
 
-    function manageCategories() {
-      const current = (appData?.summary?.categories || []).join(', ');
-      const input = prompt('Edit daftar kategori (pisahkan dengan koma):', current);
-      if (input === null) return;
+    function toggleCategoryEditor() {
+      const box = document.getElementById('categoryEditorBox');
+      box.classList.toggle('hidden');
+      if (!box.classList.contains('hidden')) {
+        document.getElementById('inputCategories').focus();
+      }
+    }
+
+    function saveCategoriesInline() {
+      const input = document.getElementById('inputCategories').value;
       const categories = input.split(',').map(s => s.trim()).filter(Boolean);
+      if (categories.length === 0) return showToast('Minimal 1 kategori', true);
       google.script.run
         .withSuccessHandler((res) => {
           if (res && res.ok) {
             appData = res.data;
+            document.getElementById('categoryEditorBox').classList.add('hidden');
             renderDashboard();
             showToast('Kategori diperbarui');
           } else {
@@ -486,7 +546,6 @@
         .handleAction({ action: 'saveCategories', pin: adminPin, data: { categories } });
     }
 
-    // CRUD Penghuni (Inline Form)
     function startEditResident(id) {
       const r = (appData?.residents || []).find(x => x.id === id);
       if (!r) return;
@@ -541,7 +600,6 @@
     }
 
     function deleteResident(id, name) {
-      if (!confirm(`Hapus permanen penghuni "${name}" (${id})?`)) return;
       google.script.run
         .withSuccessHandler((res) => {
           if (res && res.ok) {
@@ -556,11 +614,9 @@
         .handleAction({ action: 'deleteResident', pin: adminPin, data: { id } });
     }
 
-    // Piket Actions
     function generatePiket() {
       const count = document.getElementById('piketCount').value || 2;
-      const dayName = prompt('Hari pelaksanaan piket minggu ini (misal: Minggu atau Jumat Malam):', 'Minggu');
-      if (!dayName) return;
+      const dayName = document.getElementById('piketDayInput').value.trim() || 'Minggu';
       google.script.run
         .withSuccessHandler((res) => {
           if (res && res.ok) {
@@ -575,8 +631,7 @@
     }
 
     function changePiketDay() {
-      const dayName = prompt('Ganti hari piket menjadi (misal: Jumat Malam):', 'Jumat Malam');
-      if (!dayName) return;
+      const dayName = document.getElementById('piketDayInput').value.trim() || 'Minggu';
       google.script.run
         .withSuccessHandler((res) => {
           if (res && res.ok) {
@@ -591,7 +646,6 @@
     }
 
     function markPiketDone() {
-      if (!confirm('Tandai piket minggu ini sudah Selesai?')) return;
       google.script.run
         .withSuccessHandler((res) => {
           if (res && res.ok) {
@@ -605,25 +659,30 @@
         .handleAction({ action: 'markPiketDone', pin: adminPin, data: {} });
     }
 
+    function toggleSwapBox() {
+      document.getElementById('piketSwapBox').classList.toggle('hidden');
+    }
+
     function swapPiket() {
-      const oldName = prompt('Siapa yang berhalangan / mau tuker?');
-      if (!oldName) return;
-      const newName = prompt('Diganti oleh siapa?');
-      if (!newName) return;
+      const oldName = document.getElementById('swapOldName').value.trim();
+      const newName = document.getElementById('swapNewName').value.trim();
+      if (!oldName || !newName) return showToast('Isi nama yang diganti & penggantinya', true);
       google.script.run
         .withSuccessHandler((res) => {
           if (res && res.ok) {
             appData = res.data;
+            document.getElementById('swapOldName').value = '';
+            document.getElementById('swapNewName').value = '';
+            document.getElementById('piketSwapBox').classList.add('hidden');
             renderDashboard();
             showToast(`Piket ${oldName} ditukar dengan ${newName}`);
           } else {
             showToast(res ? res.error : 'Gagal', true);
           }
         })
-        .handleAction({ action: 'swapPiketMember', pin: adminPin, data: { oldName: oldName.trim(), newName: newName.trim() } });
+        .handleAction({ action: 'swapPiketMember', pin: adminPin, data: { oldName, newName } });
     }
 
-    // CRUD Transaksi Buku Kas
     function startEditTrx(id) {
       const trx = (appData?.transactions || []).find(t => t.id === id);
       if (!trx) return;
@@ -660,7 +719,6 @@
     }
 
     function deleteTrx(id) {
-      if (!confirm(`Hapus transaksi ${id} beserta foto buktinya?`)) return;
       google.script.run
         .withSuccessHandler((res) => {
           if (res && res.ok) {
@@ -795,7 +853,6 @@
     function markPaid(residentId, residentName) {
       const monthYear = document.getElementById('monthFilter').value;
       const amount = appData?.summary?.duesAmount || 80000;
-      if (!confirm(`Verifikasi iuran ${residentName} untuk bulan ${monthYear} (${fmtRp(amount)})?`)) return;
       google.script.run
         .withSuccessHandler((res) => {
           if (res && res.ok) {
@@ -811,7 +868,6 @@
 
     function unmarkPaid(residentId, residentName) {
       const monthYear = document.getElementById('monthFilter').value;
-      if (!confirm(`Batalkan status Lunas ${residentName} untuk bulan ${monthYear}? (Transaksi iuran di Buku Kas juga akan dihapus)`)) return;
       google.script.run
         .withSuccessHandler((res) => {
           if (res && res.ok) {
@@ -828,9 +884,9 @@
     function copyWaReminder() {
       const month = document.getElementById('monthFilter').value;
       const amount = appData?.summary?.duesAmount || 80000;
-      const unpaid = appData.residents
+      const unpaid = (appData?.residents || [])
         .filter(r => r.status === 'Aktif')
-        .filter(r => !appData.dues.find(d => d.residentId === r.id && d.month === month && d.status === 'Lunas'));
+        .filter(r => !(appData?.dues || []).find(d => d.residentId === r.id && d.month === month && d.status === 'Lunas'));
       const payInfo = appData?.summary?.paymentInfo || '-';
       const text = `*REKAP IURAN MES FORTRESS (${month})*\nBelum bayar (${unpaid.length} orang):\n` +
         unpaid.map((r, i) => `${i + 1}. ${r.name} (${fmtRp(amount)})`).join('\n') +
@@ -840,7 +896,7 @@
 
     function exportCsv() {
       const rows = [['ID', 'Tanggal', 'Tipe', 'Kategori', 'Keterangan', 'Qty', 'Nominal']];
-      appData.transactions.forEach(t => rows.push([t.id, t.date, t.type, t.category, `"${t.description}"`, t.qty || '', t.nominal]));
+      (appData?.transactions || []).forEach(t => rows.push([t.id, t.date, t.type, t.category, `"${t.description}"`, t.qty || '', t.nominal]));
       const csv = rows.map(r => r.join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
       const a = document.createElement('a');
