@@ -224,7 +224,7 @@ function doGet(e) {
   const rawHtml = HtmlService.createHtmlOutputFromFile('index').getContent();
   const injectedHtml = rawHtml.replace(
     'window.__INITIAL_DATA__ = null;',
-    () => `window.__INITIAL_DATA__ = ${initialDataJson};`
+    () => `window.__INITIAL_DATA__ = ${initialDataJson};\nwindow.__EXEC_URL__ = ${JSON.stringify(ScriptApp.getService().getUrl() || '')};`
   );
   return HtmlService.createHtmlOutput(injectedHtml)
     .setTitle('FortMess — Kas & Iuran Mes Putra Fortress')
