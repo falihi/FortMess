@@ -22,11 +22,17 @@ function getPaymentInfo_() {
   return PropertiesService.getScriptProperties().getProperty('PAYMENT_INFO') || 'Belum diatur oleh Bendahara';
 }
 
+function getCategories_() {
+  const saved = PropertiesService.getScriptProperties().getProperty('CATEGORIES');
+  return saved ? JSON.parse(saved) : ['Token Listrik', 'Air Galon', 'Gas', 'Kebersihan', 'Lainnya'];
+}
+
 /**
  * Jalankan fungsi ini SEKALI saja dari Apps Script Editor untuk membuat
  * 4 tab database beserta header dan data awal.
  */
 function setupDatabase() {
+  DriveApp.getRootFolder(); // Memastikan izin Google Drive aktif untuk upload foto
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // 1. Master_Penghuni
@@ -232,6 +238,38 @@ function handleAction(payload) {
       PropertiesService.getScriptProperties().setProperty('PAYMENT_INFO', info);
       logAudit(actor, 'UPDATE_PAYMENT_INFO', `Info rekening diubah: ${info}`);
       return { ok: true, data: getDashboardData() };
+    }
+
+    if (action === 'saveCategories') {
+      const cats = Array.isArray(data.categories) ? data.categories.map(c => String(c).trim()).filter(Boolean) : [];
+      if (cats.length === 0) return { ok: false, error: 'Minimal harus ada 1 kategori.' };
+      PropertiesService.getScriptProperties().setProperty('CATEGORIES', JSON.stringify(cats));
+      logAudit(actor, 'SAVE_CATEGORIES', `Kategori diperbarui: ${cats.join(', ')}`);
+      return { ok: true, data: getDashboardData() };
+    }
+
+    if (action === 'addResident') {
+      const name = String(data.name || '').trim();
+      if (!name) return { ok: false, error: 'Nama penghuni wajib diisi.' };
+      const resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
+      const id = 'R' + String(resSheet.getLastRow()).padStart(2, '0');
+      resSheet.appendRow([id, name, 'Aktif', new Date().toISOString().slice(0, 10), '']);
+      logAudit(actor, 'ADD_RESIDENT', `Tambah penghuni: ${name} (${id})`);
+      return { ok: true, data: getDashboardData() };
+    }
+
+    if (action === 'toggleResident') {
+      const resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
+      const rows = resSheet.getDataRange().getValues();
+      for (let i = 1; i < rows.length; i++) {
+        if (rows[i][0] === data.id) {
+          const newStatus = rows[i][2] === 'Aktif' ? 'Non-Aktif' : 'Aktif';
+          resSheet.getRange(i + 1, 3).setValue(newStatus);
+          logAudit(actor, 'TOGGLE_RESIDENT', `${rows[i][1]} -> ${newStatus}`);
+          return { ok: true, data: getDashboardData() };
+        }
+      }
+      return { ok: false, error: 'Penghuni tidak ditemukan.' };
     }
 
     if (action === 'addTransaction') {
@@ -442,6 +480,7 @@ function getDashboardData() {
       activeResidents: residents.filter(r => r.status === 'Aktif').length,
       duesAmount: getDuesAmount_(),
       paymentInfo: getPaymentInfo_(),
+      categories: getCategories_(),
     },
     residents,
     dues,

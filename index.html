@@ -93,15 +93,12 @@
             <option value="Pengeluaran">Pengeluaran</option>
             <option value="Pemasukan">Pemasukan</option>
           </select>
-          <select id="trxCategory" class="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white">
-            <option value="Listrik">Token Listrik</option>
-            <option value="Galon">Air Galon</option>
-            <option value="Gas">Gas</option>
-            <option value="Kebersihan">Kebersihan</option>
-            <option value="Lainnya">Lainnya</option>
-          </select>
+          <div class="flex gap-1">
+            <select id="trxCategory" class="flex-1 px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white"></select>
+            <button type="button" onclick="manageCategories()" class="px-2 py-1 text-xs rounded-lg border border-slate-300 bg-white hover:bg-slate-100" title="Kelola Kategori">⚙️</button>
+          </div>
           <input id="trxDesc" type="text" placeholder="Keterangan" required class="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white sm:col-span-2" />
-          <input id="trxNominal" type="number" placeholder="Nominal (Rp)" required min="1" class="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white" />
+          <input id="trxNominal" type="text" inputmode="numeric" oninput="formatNominalInput(this)" placeholder="Nominal (100.000)" required class="px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white" />
           <input id="trxProof" type="file" accept="image/*" class="sm:col-span-5 text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300" />
           <button type="submit" class="sm:col-span-5 py-2 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-700">
             + Catat Transaksi
@@ -111,9 +108,12 @@
 
       <!-- Daftar Penghuni Aktif & Iuran -->
       <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-        <div class="flex items-center justify-between">
-          <h2 class="text-sm font-bold text-slate-900">Status Iuran Penghuni Aktif</h2>
-          <input id="monthFilter" type="month" onchange="renderDashboard()" class="text-xs px-2.5 py-1 rounded-lg border border-slate-300" />
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-sm font-bold text-slate-900">Status Iuran Penghuni</h2>
+          <div class="flex items-center gap-2">
+            <button id="btnAddResident" onclick="addResident()" class="hidden text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700">+ Penghuni</button>
+            <input id="monthFilter" type="month" onchange="renderDashboard()" class="text-xs px-2.5 py-1 rounded-lg border border-slate-300" />
+          </div>
         </div>
         <div id="residentsList" class="divide-y divide-slate-100 text-sm"></div>
       </section>
@@ -135,9 +135,14 @@
 
       <!-- Buku Kas -->
       <section class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-wrap items-center justify-between gap-2">
           <h2 class="text-sm font-bold text-slate-900">Riwayat Buku Kas</h2>
-          <button onclick="exportCsv()" class="text-xs px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-100">Export CSV</button>
+          <div class="flex items-center gap-2">
+            <select id="ledgerMonthFilter" onchange="renderDashboard()" class="text-xs px-2.5 py-1 rounded-lg border border-slate-300 bg-white">
+              <option value="ALL">Semua Bulan</option>
+            </select>
+            <button onclick="exportCsv()" class="text-xs px-3 py-1 rounded-lg border border-slate-300 hover:bg-slate-100">Export CSV</button>
+          </div>
         </div>
         <div id="ledgerList" class="divide-y divide-slate-100 text-xs"></div>
       </section>
@@ -188,31 +193,42 @@
       document.getElementById('inputDuesAmount').value = summary.duesAmount;
       document.getElementById('valPaymentInfo').textContent = summary.paymentInfo || 'Belum diatur oleh Bendahara';
       document.getElementById('inputPaymentInfo').value = summary.paymentInfo || '';
+
+      const cats = summary.categories || ['Token Listrik', 'Air Galon', 'Gas', 'Kebersihan', 'Lainnya'];
+      document.getElementById('trxCategory').innerHTML = cats.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+
+      const ledgerFilterEl = document.getElementById('ledgerMonthFilter');
+      const currentLedgerFilter = ledgerFilterEl.value || 'ALL';
+      const months = [...new Set(transactions.map(t => String(t.date).slice(0, 7)).filter(Boolean))].sort().reverse();
+      ledgerFilterEl.innerHTML = '<option value="ALL">Semua Bulan</option>' + months.map(m => `<option value="${m}">${m}</option>`).join('');
+      ledgerFilterEl.value = months.includes(currentLedgerFilter) ? currentLedgerFilter : 'ALL';
       document.getElementById('valBalance').textContent = fmtRp(summary.balance);
       document.getElementById('valIncome').textContent = fmtRp(summary.totalIncome);
       document.getElementById('valExpense').textContent = fmtRp(summary.totalExpense);
 
       const selectedMonth = document.getElementById('monthFilter').value;
-      const activeRes = residents.filter(r => r.status === 'Aktif');
-      const resHtml = activeRes.map(r => {
+      const visibleRes = adminPin ? residents : residents.filter(r => r.status === 'Aktif');
+      const resHtml = visibleRes.map(r => {
+        const isAktif = r.status === 'Aktif';
         const paid = dues.find(d => d.residentId === r.id && d.month === selectedMonth && d.status === 'Lunas');
         return `
-          <div class="py-2.5 flex items-center justify-between">
+          <div class="py-2.5 flex items-center justify-between gap-2 ${!isAktif ? 'opacity-50' : ''}">
             <div>
-              <p class="font-medium text-slate-800">${escHtml(r.name)}</p>
+              <p class="font-medium text-slate-800">${escHtml(r.name)} ${!isAktif ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">Non-Aktif</span>' : ''}</p>
               <p class="text-xs text-slate-400">${escHtml(r.id)}</p>
             </div>
             <div class="flex items-center gap-2">
-              <span class="text-xs px-2.5 py-1 rounded-full font-medium ${paid ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
-                ${paid ? 'Lunas' : 'Belum Bayar'}
-              </span>
-              ${(!paid && adminPin) ? `<button onclick="markPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700">Verifikasi</button>` : ''}
+              ${isAktif ? `<span class="text-xs px-2.5 py-1 rounded-full font-medium ${paid ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">${paid ? 'Lunas' : 'Belum Bayar'}</span>` : ''}
+              ${(isAktif && !paid && adminPin) ? `<button onclick="markPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-700">Verifikasi</button>` : ''}
+              ${adminPin ? `<button onclick="toggleResident('${escHtml(r.id)}')" class="text-xs px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-100">${isAktif ? 'Non-Aktifkan' : 'Aktifkan'}</button>` : ''}
             </div>
           </div>`;
       }).join('');
       document.getElementById('residentsList').innerHTML = resHtml || '<p class="py-4 text-center text-slate-400 text-xs">Belum ada penghuni aktif.</p>';
 
-      const trxHtml = transactions.slice(0, 30).map(t => {
+      const filterMonth = document.getElementById('ledgerMonthFilter').value;
+      const filteredTrx = filterMonth === 'ALL' ? transactions : transactions.filter(t => String(t.date).startsWith(filterMonth));
+      const trxHtml = filteredTrx.slice(0, 50).map(t => {
         const safeUrl = (t.proofUrl && t.proofUrl.startsWith('https://')) ? escHtml(t.proofUrl) : '';
         return `
         <div class="py-2.5 flex items-center justify-between gap-2">
@@ -257,6 +273,7 @@
             document.getElementById('roleBadge').className = 'text-xs px-3 py-1.5 rounded-full bg-amber-400/20 text-amber-300 font-semibold border border-amber-400/30';
             document.getElementById('adminPanel').classList.remove('hidden');
             document.getElementById('piketAdminBtns').classList.remove('hidden');
+            document.getElementById('btnAddResident').classList.remove('hidden');
             document.getElementById('btnAdminAuth').classList.add('hidden');
             renderDashboard();
             showToast('Login Bendahara berhasil');
@@ -274,6 +291,59 @@
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
+    }
+
+    function formatNominalInput(el) {
+      const digits = el.value.replace(/\D/g, '');
+      el.value = digits ? Number(digits).toLocaleString('id-ID') : '';
+    }
+
+    function manageCategories() {
+      const current = (appData?.summary?.categories || []).join(', ');
+      const input = prompt('Edit daftar kategori (pisahkan dengan koma):', current);
+      if (input === null) return;
+      const categories = input.split(',').map(s => s.trim()).filter(Boolean);
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            appData = res.data;
+            renderDashboard();
+            showToast('Kategori diperbarui');
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction({ action: 'saveCategories', pin: adminPin, data: { categories } });
+    }
+
+    function addResident() {
+      const name = prompt('Nama penghuni baru:');
+      if (!name) return;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            appData = res.data;
+            renderDashboard();
+            showToast(`Penghuni ${name} ditambahkan`);
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction({ action: 'addResident', pin: adminPin, data: { name } });
+    }
+
+    function toggleResident(id) {
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res.ok) {
+            appData = res.data;
+            renderDashboard();
+            showToast('Status penghuni diperbarui');
+          } else {
+            showToast(res.error, true);
+          }
+        })
+        .handleAction({ action: 'toggleResident', pin: adminPin, data: { id } });
     }
 
     function generatePiket() {
@@ -381,7 +451,7 @@
             type: document.getElementById('trxType').value,
             category: document.getElementById('trxCategory').value,
             description: document.getElementById('trxDesc').value,
-            nominal: document.getElementById('trxNominal').value,
+            nominal: document.getElementById('trxNominal').value.replace(/\D/g, ''),
             proof,
           },
         };
