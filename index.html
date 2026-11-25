@@ -301,24 +301,12 @@
             <span class="text-stone-500">💡 Tiap minggu bisa digeser ke <strong>Jumat Malam</strong> atau tukar orang jika berhalangan</span>
           </div>
 
-          <!-- Kontrol Generate 1 Bulan Penuh (Khusus Bendahara) -->
-          <div id="piketAdminBtns" class="hidden p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-3">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="text-xs font-bold text-stone-800">⚙️ Buat / Acak Ulang Jadwal Piket 1 Bulan Penuh (Minggu 1 s/d Minggu Akhir):</p>
-              <div class="flex flex-wrap items-center gap-2">
-                <div class="flex items-center gap-1.5">
-                  <label class="text-xs font-semibold text-stone-600">Orang / Minggu:</label>
-                  <input id="piketCount" type="number" min="1" max="10" value="2" class="w-14 px-2.5 py-1.5 text-xs font-bold rounded-lg border border-stone-300 bg-white" />
-                </div>
-                <div class="flex items-center gap-1.5">
-                  <label class="text-xs font-semibold text-stone-600">Hari Default:</label>
-                  <input id="piketDayInput" type="text" value="Minggu" placeholder="Minggu / Jumat Malam" class="w-28 px-2.5 py-1.5 text-xs font-bold rounded-lg border border-stone-300 bg-white" />
-                </div>
-                <button type="button" onclick="generateMonthlyPiketUI()" class="text-xs px-4 py-2 rounded-xl bg-stone-900 text-white font-bold hover:bg-stone-800 shadow-sm">
-                  🎲 Acak & Bagi Rata 1 Bulan
-                </button>
-              </div>
-            </div>
+          <!-- Kontrol Generate 1 Bulan Penuh (100% Otomatis, 1 Klik) -->
+          <div id="piketAdminBtns" class="hidden p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs font-bold text-stone-800">⚙️ Jumlah petugas per minggu sudah dibagi rata otomatis sesuai penghuni aktif:</p>
+            <button type="button" onclick="generateMonthlyPiketUI()" class="text-xs px-4 py-2 rounded-xl bg-stone-900 text-white font-bold hover:bg-stone-800 shadow-sm">
+              🎲 Acak Ulang Giliran Bulan Ini
+            </button>
           </div>
 
           <!-- Daftar Minggu 1 s/d Minggu Akhir -->
@@ -782,16 +770,13 @@
       }).join('');
       document.getElementById('residentsList').innerHTML = resHtml || '<p class="py-6 text-center text-stone-400 text-xs">Belum ada daftar penghuni aktif.</p>';
 
-      // ==================== RENDER JADWAL PIKET BULANAN (MINGGU 1 - AKHIR) ====================
+      // ==================== RENDER JADWAL PIKET BULANAN (MINGGU 1 - AKHIR, 100% OTOMATIS) ====================
       const piketMonth = document.getElementById('piketMonthFilter').value || selectedMonth;
       const monthWeeks = getWeeksInMonth(piketMonth);
       const activeNames = activeResidentsList.map(r => r.name);
-      const idealPerWeek = activeNames.length > 0 ? Math.max(Math.ceil(activeNames.length / monthWeeks.length), 1) : 2;
+      const schedules = buildOrLoadMonthlyPiket(piketMonth, monthWeeks, activeNames);
       document.getElementById('piketStatsText').textContent =
-        `📊 ${fmtMonthIndo(piketMonth)}: Ada ${monthWeeks.length} Minggu (${monthWeeks[0]?.shortDate || ''} – ${monthWeeks[monthWeeks.length - 1]?.shortDate || ''}) • ${activeNames.length} Penghuni Aktif • Ideal: ${idealPerWeek} Orang/Minggu`;
-
-      const schedules = buildOrLoadMonthlyPiket(piketMonth, monthWeeks, activeNames, idealPerWeek);
-      const todayIso = new Date().toISOString().slice(0, 10);
+        `📊 ${fmtMonthIndo(piketMonth)}: ${monthWeeks.length} Minggu (${monthWeeks[0]?.shortDate || ''} – ${monthWeeks[monthWeeks.length - 1]?.shortDate || ''}) • ${activeNames.length} Penghuni Aktif dibagi rata otomatis`;
 
       const piketCardsHtml = schedules.map((item, idx) => {
         const isCurrentWeek = item.isCurrentWeek;
@@ -1028,7 +1013,19 @@
       });
     }
 
-    function buildOrLoadMonthlyPiket(ym, monthWeeks, activeNames, defaultCount) {
+    // Hitung kuota orang per minggu secara otomatis (bagi rata N orang ke W minggu, minimal 2 orang/minggu jika penghuni >= 2)
+    function distributeSlots_(totalPeople, totalWeeks) {
+      if (totalWeeks <= 0) return [];
+      if (totalPeople <= 1) return Array(totalWeeks).fill(totalPeople);
+      const base = Math.floor(totalPeople / totalWeeks);
+      const rem = totalPeople % totalWeeks;
+      return Array.from({ length: totalWeeks }, (_, i) => {
+        const raw = base + (i < rem ? 1 : 0);
+        return Math.max(raw, Math.min(2, totalPeople));
+      });
+    }
+
+    function buildOrLoadMonthlyPiket(ym, monthWeeks, activeNames) {
       const storageKey = 'FORTMESS_PIKET_' + ym;
       const sheetRows = (appData?.piket || []).filter(p => String(p.week || '').startsWith('Minggu '));
 
@@ -1051,7 +1048,7 @@
         return currentMonthlySchedules;
       }
 
-      if (saved && saved.length === monthWeeks.length) {
+      if (saved && saved.length === monthWeeks.length && saved._activeKey === activeNames.join('|')) {
         currentMonthlySchedules = monthWeeks.map((w, idx) => ({
           ...saved[idx],
           ...w,
@@ -1059,15 +1056,17 @@
         return currentMonthlySchedules;
       }
 
-      // Bagi rata seluruh penghuni aktif dari Minggu 1 sampai Minggu Akhir secara berurutan
-      const perWeek = Math.max(Number(defaultCount) || 2, 1);
+      // Bagi rata seluruh penghuni aktif dari Minggu 1 sampai Minggu Akhir secara otomatis
+      const slots = distributeSlots_(activeNames.length, monthWeeks.length);
       const pool = activeNames.length > 0 ? [...activeNames] : ['Belum ada penghuni'];
       let cursor = 0;
 
-      currentMonthlySchedules = monthWeeks.map((w) => {
+      currentMonthlySchedules = monthWeeks.map((w, idx) => {
+        const countForWeek = slots[idx] || 1;
         const picked = [];
-        for (let k = 0; k < Math.min(perWeek, pool.length); k++) {
-          picked.push(pool[cursor % pool.length]);
+        for (let k = 0; k < countForWeek; k++) {
+          const candidate = pool[cursor % pool.length];
+          if (!picked.includes(candidate)) picked.push(candidate);
           cursor++;
         }
         return {
@@ -1076,11 +1075,14 @@
           day: 'Minggu',
           assignees: picked.join(', '),
           status: 'Terjadwal',
-          note: `Giliran terjadwal (${picked.length} orang)`,
+          note: `Otomatis (${picked.length} orang)`,
         };
       });
 
-      try { localStorage.setItem(storageKey, JSON.stringify(currentMonthlySchedules)); } catch (e) {}
+      try {
+        const toSave = [...currentMonthlySchedules];
+        localStorage.setItem(storageKey, JSON.stringify(toSave));
+      } catch (e) {}
       return currentMonthlySchedules;
     }
 
@@ -1116,10 +1118,7 @@
       const activeNames = (appData?.residents || []).filter(r => r.status === 'Aktif').map(r => r.name);
       if (activeNames.length === 0) return showToast('Tidak ada penghuni aktif', true);
 
-      const perWeek = Math.min(Math.max(Number(document.getElementById('piketCount').value) || 2, 1), activeNames.length);
-      const defaultDay = document.getElementById('piketDayInput').value.trim() || 'Minggu';
-
-      // Fair Round-Robin Shuffle: acak urutan seluruh penghuni aktif, lalu bagi rata Minggu 1..Akhir tanpa dobel di putaran yang sama
+      const slots = distributeSlots_(activeNames.length, monthWeeks.length);
       const shuffle = (arr) => {
         const copy = [...arr];
         for (let i = copy.length - 1; i > 0; i--) {
@@ -1130,11 +1129,11 @@
       };
 
       let queue = shuffle(activeNames);
-      currentMonthlySchedules = monthWeeks.map((w) => {
+      currentMonthlySchedules = monthWeeks.map((w, idx) => {
+        const perWeek = slots[idx] || 2;
         const picked = [];
         while (picked.length < perWeek) {
           if (queue.length === 0) {
-            // Putaran berikutnya: acak ulang dengan menghindari orang yang sudah masuk di minggu yang sama
             queue = shuffle(activeNames.filter(n => !picked.includes(n)));
           }
           const candidate = queue.shift();
@@ -1145,10 +1144,10 @@
         return {
           ...w,
           week: w.weekLabel,
-          day: defaultDay,
+          day: 'Minggu',
           assignees: picked.join(', '),
           status: 'Terjadwal',
-          note: `Diacak adil (${picked.length} orang)`,
+          note: `Diacak adil otomatis (${picked.length} orang)`,
         };
       });
 
@@ -1156,7 +1155,7 @@
         ym,
         'saveMonthlyPiket',
         { monthYear: ym, schedules: currentMonthlySchedules },
-        `Jadwal piket ${monthWeeks.length} minggu (${fmtMonthIndo(ym)}) berhasil diacak!`
+        `Jadwal piket ${monthWeeks.length} minggu (${fmtMonthIndo(ym)}) berhasil diacak otomatis!`
       );
     }
 
