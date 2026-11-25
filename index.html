@@ -272,7 +272,11 @@
             document.getElementById('mainContent').classList.remove('hidden');
             renderDashboard();
           })
-          .withFailureHandler((err) => showToast('Gagal memuat data: ' + err.message, true))
+          .withFailureHandler((err) => {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            showToast('Gagal memuat data: ' + err.message, true);
+          })
           .getDashboardData();
       } else {
         document.getElementById('loadingState').textContent = 'Jalankan melalui Google Apps Script Web App untuk terhubung ke Google Sheets.';
@@ -370,6 +374,7 @@
             <div class="flex flex-wrap items-center gap-1.5">
               ${isAktif ? `<span class="text-xs px-2.5 py-1 rounded-full font-medium ${paid ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">${paid ? 'Lunas' : 'Belum Bayar'}</span>` : ''}
               ${(isAktif && !paid && adminPin) ? `<button onclick="markPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-3 py-1.5 rounded-lg bg-stone-900 text-white hover:bg-stone-800">Verifikasi</button>` : ''}
+              ${(isAktif && paid && adminPin) ? `<button onclick="unmarkPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-2.5 py-1.5 rounded-lg border border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100">Batal Lunas</button>` : ''}
               ${adminPin ? `
                 <button onclick="toggleResident('${escHtml(r.id)}')" class="text-xs px-2.5 py-1.5 rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">${isAktif ? 'Non-Aktifkan' : 'Aktifkan'}</button>
                 <button onclick="startEditResident('${escHtml(r.id)}')" title="Edit Penghuni" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">✎</button>
@@ -406,6 +411,8 @@
             adminPin = pin;
             document.getElementById('roleBadge').textContent = 'Mode: Bendahara';
             document.getElementById('roleBadge').className = 'text-xs px-3 py-1.5 rounded-full bg-amber-400/20 text-amber-300 font-semibold border border-amber-400/30';
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
             document.getElementById('adminSettingsPanel').classList.remove('hidden');
             document.getElementById('adminPanel').classList.remove('hidden');
             document.getElementById('residentForm').classList.remove('hidden');
@@ -800,6 +807,22 @@
           }
         })
         .handleAction({ action: 'markDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear, amount } });
+    }
+
+    function unmarkPaid(residentId, residentName) {
+      const monthYear = document.getElementById('monthFilter').value;
+      if (!confirm(`Batalkan status Lunas ${residentName} untuk bulan ${monthYear}? (Transaksi iuran di Buku Kas juga akan dihapus)`)) return;
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res && res.ok) {
+            appData = res.data;
+            renderDashboard();
+            showToast(`Status lunas ${residentName} dibatalkan`);
+          } else {
+            showToast(res ? res.error : 'Gagal', true);
+          }
+        })
+        .handleAction({ action: 'unmarkDuesPaid', pin: adminPin, data: { residentId, residentName, monthYear } });
     }
 
     function copyWaReminder() {

@@ -31,13 +31,30 @@ function getSpreadsheet_() {
   const props = PropertiesService.getScriptProperties();
   const savedId = props.getProperty('SPREADSHEET_ID');
   if (savedId) {
-    const m = savedId.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    const cleanId = m ? m[1] : savedId.trim();
-    return SpreadsheetApp.openById(cleanId);
+    try {
+      const m = savedId.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      const cleanId = m ? m[1] : savedId.trim();
+      return SpreadsheetApp.openById(cleanId);
+    } catch (e) {
+      // Lanjut ke auto-discovery jika ID lama tidak valid
+    }
   }
   const active = SpreadsheetApp.getActiveSpreadsheet();
-  if (active) return active;
-  throw new Error('Spreadsheet belum terhubung! Isi SPREADSHEET_ID (link Google Sheet) di Properti Skrip atau buka dari menu Extensions > Apps Script di dalam Google Sheet.');
+  if (active) {
+    props.setProperty('SPREADSHEET_ID', active.getId());
+    return active;
+  }
+  // Auto-discovery: cari file 'Database Kas FortMess' di Google Drive
+  const files = DriveApp.getFilesByName('Database Kas FortMess');
+  if (files.hasNext()) {
+    const file = files.next();
+    props.setProperty('SPREADSHEET_ID', file.getId());
+    return SpreadsheetApp.openById(file.getId());
+  }
+  // Jika belum ada sama sekali, buat otomatis
+  const created = SpreadsheetApp.create('Database Kas FortMess');
+  props.setProperty('SPREADSHEET_ID', created.getId());
+  return created;
 }
 
 function ensureSheets_(ss) {
@@ -47,6 +64,7 @@ function ensureSheets_(ss) {
     resSheet = ss.insertSheet(SHEET_NAMES.RESIDENTS);
     resSheet.appendRow(['ID', 'Nama', 'Status', 'Tanggal_Masuk', 'Catatan']);
     resSheet.getRange('A1:E1').setFontWeight('bold').setBackground('#e2e8f0');
+    resSheet.getRange('A:E').setNumberFormat('@');
     const initialResidents = [
       ['R01', 'Achdi', 'Aktif', '2026-07-01', ''],
       ['R02', 'Falih', 'Aktif', '2026-07-01', ''],
@@ -70,6 +88,8 @@ function ensureSheets_(ss) {
     duesSheet = ss.insertSheet(SHEET_NAMES.DUES);
     duesSheet.appendRow(['ID_Penghuni', 'Nama', 'Bulan', 'Nominal', 'Status', 'Tanggal_Bayar', 'Diverifikasi_Oleh']);
     duesSheet.getRange('A1:G1').setFontWeight('bold').setBackground('#e2e8f0');
+    duesSheet.getRange('A:C').setNumberFormat('@');
+    duesSheet.getRange('F:G').setNumberFormat('@');
   }
 
   // 3. Buku_Kas
@@ -78,6 +98,7 @@ function ensureSheets_(ss) {
     ledgerSheet = ss.insertSheet(SHEET_NAMES.LEDGER);
     ledgerSheet.appendRow(['ID_Trx', 'Tanggal', 'Tipe', 'Kategori', 'Keterangan', 'Qty', 'Nominal', 'Dicatat_Oleh', 'Bukti_URL']);
     ledgerSheet.getRange('A1:I1').setFontWeight('bold').setBackground('#e2e8f0');
+    ledgerSheet.getRange('A:B').setNumberFormat('@');
     ledgerSheet.appendRow(['TRX-000', '2026-11-01', 'Pemasukan', 'Saldo Awal', 'Saldo Awal Cutoff Migrasi', 1, 591600, 'System', '']);
   }
 
@@ -97,6 +118,14 @@ function ensureSheets_(ss) {
     auditSheet.appendRow(['Timestamp', 'Aktor', 'Aksi', 'Detail']);
     auditSheet.getRange('A1:D1').setFontWeight('bold').setBackground('#fee2e2');
   }
+
+  // Bersihkan tab kosong bawaan (Sheet1 / Lembar1) agar user tidak bingung melihat sheet kosong
+  ['Sheet1', 'Sheet 1', 'Lembar1', 'Lembar 1'].forEach(defaultName => {
+    const s = ss.getSheetByName(defaultName);
+    if (s && s.getLastRow() === 0 && ss.getSheets().length > 1) {
+      try { ss.deleteSheet(s); } catch (e) {}
+    }
+  });
 }
 
 /**
@@ -432,9 +461,26 @@ function handleAction(payload) {
       const rows = sheet.getDataRange().getValues();
       for (let i = 1; i < rows.length; i++) {
         if (String(rows[i][0]) === String(data.id)) {
+          const desc = String(rows[i][4] || '');
           trashDriveFileByUrl_(rows[i][8]);
           sheet.deleteRow(i + 1);
-          logAudit(actor, 'DELETE_TRX', `Hapus transaksi ${data.id}: ${rows[i][4]} (${rows[i][6]})`);
+
+          // Jika transaksi yang dihapus adalah Iuran Bulanan, sinkronkan hapus dari Matriks_Iuran
+          const m = desc.match(/^Iuran\s+(.+)\s+\((\d{4}-\d{2})\)$/i);
+          if (m) {
+            const targetName = m[1].trim().toLowerCase();
+            const targetMonth = m[2];
+            const duesSheet = ss.getSheetByName(SHEET_NAMES.DUES);
+            const dRows = duesSheet.getDataRange().getValues();
+            for (let j = dRows.length - 1; j >= 1; j--) {
+              if (String(dRows[j][1]).trim().toLowerCase() === targetName && fmtMonth_(dRows[j][2]) === targetMonth) {
+                duesSheet.deleteRow(j + 1);
+                break;
+              }
+            }
+          }
+
+          logAudit(actor, 'DELETE_TRX', `Hapus transaksi ${data.id}: ${desc} (${rows[i][6]})`);
           return { ok: true, data: getDashboardData() };
         }
       }
@@ -455,7 +501,7 @@ function handleAction(payload) {
       }
 
       const today = new Date().toISOString().slice(0, 10);
-      duesSheet.appendRow([residentId, residentName, monthYear, payAmount, 'Lunas', today, actor]);
+      duesSheet.appendRow([residentId, residentName, String(monthYear), payAmount, 'Lunas', today, actor]);
 
       const trxId = 'IUR-' + Date.now().toString().slice(-6);
       ledgerSheet.appendRow([
@@ -471,6 +517,34 @@ function handleAction(payload) {
       ]);
 
       logAudit(actor, 'MARK_DUES_PAID', `${residentName} - ${monthYear} (${payAmount})`);
+      return { ok: true, data: getDashboardData() };
+    }
+
+    if (action === 'unmarkDuesPaid') {
+      const duesSheet = ss.getSheetByName(SHEET_NAMES.DUES);
+      const ledgerSheet = ss.getSheetByName(SHEET_NAMES.LEDGER);
+      const { residentId, residentName, monthYear } = data;
+      const dRows = duesSheet.getDataRange().getValues();
+      let found = false;
+      for (let i = dRows.length - 1; i >= 1; i--) {
+        if (String(dRows[i][0]) === String(residentId) && fmtMonth_(dRows[i][2]) === monthYear) {
+          duesSheet.deleteRow(i + 1);
+          found = true;
+          break;
+        }
+      }
+      if (!found) return { ok: false, error: 'Data lunas tidak ditemukan.' };
+
+      const targetDesc = `Iuran ${residentName} (${monthYear})`.toLowerCase();
+      const lRows = ledgerSheet.getDataRange().getValues();
+      for (let j = lRows.length - 1; j >= 1; j--) {
+        if (String(lRows[j][4] || '').trim().toLowerCase() === targetDesc) {
+          ledgerSheet.deleteRow(j + 1);
+          break;
+        }
+      }
+
+      logAudit(actor, 'UNMARK_DUES_PAID', `Batal lunas: ${residentName} - ${monthYear}`);
       return { ok: true, data: getDashboardData() };
     }
 
