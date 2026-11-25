@@ -227,7 +227,10 @@ function doGet(e) {
       .createTextOutput(JSON.stringify(getDashboardData()))
       .setMimeType(ContentService.MimeType.JSON);
   }
-  return HtmlService.createHtmlOutputFromFile('index')
+  const initialDataJson = JSON.stringify(getDashboardData());
+  const rawHtml = HtmlService.createHtmlOutputFromFile('index').getContent();
+  const injectedHtml = rawHtml.replace('window.__INITIAL_DATA__ = null;', 'window.__INITIAL_DATA__ = ' + initialDataJson + ';');
+  return HtmlService.createHtmlOutput(injectedHtml)
     .setTitle('FortMess — Kas & Iuran Mes Putra Fortress')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -640,7 +643,9 @@ function fmtMonth_(v) {
 function getDashboardData() {
   try {
     const ss = getSpreadsheet_();
-    ensureSheets_(ss);
+    if (!ss.getSheetByName(SHEET_NAMES.LEDGER) || !ss.getSheetByName(SHEET_NAMES.RESIDENTS)) {
+      ensureSheets_(ss);
+    }
     const resSheet = ss.getSheetByName(SHEET_NAMES.RESIDENTS);
     const duesSheet = ss.getSheetByName(SHEET_NAMES.DUES);
     const ledgerSheet = ss.getSheetByName(SHEET_NAMES.LEDGER);

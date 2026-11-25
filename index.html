@@ -241,6 +241,7 @@
   </div>
 
   <script>
+    window.__INITIAL_DATA__ = null;
     let appData = null;
     let adminPin = null;
     let editingTrxId = null;
@@ -327,7 +328,17 @@
       document.getElementById('monthFilter').value = todayIso.slice(0, 7);
       document.getElementById('trxDate').value = todayIso;
       setTrxType('Pengeluaran');
-      loadData();
+      if (window.__INITIAL_DATA__) {
+        appData = window.__INITIAL_DATA__;
+        if (appData.error) {
+          document.getElementById('loadingText').textContent = '⚠️ ' + appData.error;
+        } else {
+          document.getElementById('loadingState').classList.add('hidden');
+        }
+        renderDashboard();
+      } else {
+        loadData();
+      }
     }
 
     function loadData() {
