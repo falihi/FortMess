@@ -136,23 +136,6 @@ function setupDatabase() {
   logAudit('System', 'SETUP_DB', 'Inisialisasi tab database FortMess di ' + ss.getName());
 }
 
-/**
- * Jalankan fungsi ini SEKALI saja untuk mengatur PIN Admin (disimpan sebagai SHA-256 hash).
- * Contoh: setAdminPin('123456') -> lalu hapus angka PIN-nya sebelum save.
- */
-function initPin() {
-  setAdminPin('123456'); // Ganti dengan PIN rahasia kamu, lalu Run sekali
-}
-
-function setAdminPin(plainPin) {
-  if (!plainPin || String(plainPin).length < 4) {
-    throw new Error('PIN minimal 4 karakter');
-  }
-  const hash = hashPin_(String(plainPin));
-  PropertiesService.getScriptProperties().setProperty('ADMIN_PIN_HASH', hash);
-  logAudit('System', 'SET_ADMIN_PIN', 'Admin PIN hash diperbarui');
-}
-
 function hashPin_(pin) {
   const rawHash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, pin);
   return rawHash.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
@@ -160,11 +143,11 @@ function hashPin_(pin) {
 
 function verifyAdmin_(pin) {
   const props = PropertiesService.getScriptProperties();
-  const plainProp = props.getProperty('initPin') || props.getProperty('ADMIN_PIN');
-  if (plainProp && String(pin || '') === plainProp) return true;
+  const savedPin = props.getProperty('ADMIN_PIN') || props.getProperty('initPin');
+  if (savedPin) return String(pin || '') === String(savedPin);
   const savedHash = props.getProperty('ADMIN_PIN_HASH');
-  if (!savedHash) return false;
-  return hashPin_(String(pin || '')) === savedHash;
+  if (savedHash) return hashPin_(String(pin || '')) === savedHash;
+  return false;
 }
 
 function getOrCreateFolder_(parent, name) {
