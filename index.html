@@ -266,12 +266,17 @@
           </div>
 
           <!-- Form Tambah/Edit Penghuni (Khusus Bendahara) -->
-          <form id="residentForm" onsubmit="submitResident(event)" class="hidden grid grid-cols-1 sm:grid-cols-5 gap-2 p-3.5 rounded-xl bg-amber-50/60 border border-amber-200">
+          <form id="residentForm" onsubmit="submitResident(event)" class="hidden grid grid-cols-1 sm:grid-cols-6 gap-2 p-3.5 rounded-xl bg-amber-50/60 border border-amber-200">
             <input type="hidden" id="editResId" value="" />
             <input id="resName" type="text" placeholder="Nama penghuni baru..." required class="sm:col-span-2 px-3 py-2 text-xs rounded-lg border border-stone-300 bg-white focus:outline-none" />
-            <input id="resNote" type="text" placeholder="Kamar / Keterangan (opsional)" class="sm:col-span-2 px-3 py-2 text-xs rounded-lg border border-stone-300 bg-white focus:outline-none" />
+            <select id="resRoleType" class="px-2.5 py-2 text-xs font-semibold rounded-lg border border-stone-300 bg-white focus:outline-none">
+              <option value="EMPLOYEE">💼 Employee (Wajib Bayar)</option>
+              <option value="MAGANG_FREE">🎓 Magang (Bebas Iuran)</option>
+              <option value="MAGANG_PAID">🎓 Magang (Wajib Bayar)</option>
+            </select>
+            <input id="resNote" type="text" placeholder="Kamar / Ket (opsional)" class="sm:col-span-2 px-3 py-2 text-xs rounded-lg border border-stone-300 bg-white focus:outline-none" />
             <div class="flex gap-1.5">
-              <button id="btnSubmitRes" type="submit" class="flex-1 py-2 px-3 rounded-lg bg-stone-900 text-white text-xs font-bold hover:bg-stone-800">+ Tambah Orang</button>
+              <button id="btnSubmitRes" type="submit" class="flex-1 py-2 px-3 rounded-lg bg-stone-900 text-white text-xs font-bold hover:bg-stone-800">+ Tambah</button>
               <button id="btnCancelRes" type="button" onclick="cancelEditResident()" class="hidden py-2 px-2.5 rounded-lg border border-stone-300 bg-white text-xs text-stone-600">Batal</button>
             </div>
           </form>
@@ -552,6 +557,45 @@
       showToast('Keluar dari Mode Bendahara');
     }
 
+    function getLocalRolesMap() {
+      try {
+        return JSON.parse(localStorage.getItem('FORTMESS_RES_ROLES') || '{}');
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function saveLocalRole(id, roleType) {
+      try {
+        const map = getLocalRolesMap();
+        map[id] = roleType;
+        localStorage.setItem('FORTMESS_RES_ROLES', JSON.stringify(map));
+      } catch (e) {}
+    }
+
+    function parseResidentMeta(r) {
+      const rawNote = String(r?.note || '');
+      const localMap = getLocalRolesMap();
+      let roleType = localMap[r?.id] || 'EMPLOYEE';
+      let cleanNote = rawNote;
+
+      const m = rawNote.match(/^\[(EMPLOYEE|MAGANG_FREE|MAGANG_PAID)\]\s*(.*)$/);
+      if (m) {
+        roleType = m[1];
+        cleanNote = m[2] || '';
+      }
+      if (cleanNote === 'Keluar') cleanNote = '';
+
+      const isMagang = roleType === 'MAGANG_FREE' || roleType === 'MAGANG_PAID';
+      const mustPay = roleType !== 'MAGANG_FREE';
+      return { roleType, isMagang, mustPay, cleanNote };
+    }
+
+    function encodeResidentNote(roleType, cleanNote) {
+      const text = String(cleanNote || '').trim();
+      return `[${roleType || 'EMPLOYEE'}]${text ? ' ' + text : ''}`;
+    }
+
     function saveCache(data) {
       if (!data || data.error) return;
       try { localStorage.setItem('FORTMESS_CACHE_V1', JSON.stringify(data)); } catch (e) {}
@@ -644,11 +688,13 @@
         months.map(m => `<option value="${m}">${fmtMonthIndo(m)}</option>`).join('');
       ledgerFilterEl.value = months.includes(currentLedgerFilter) ? currentLedgerFilter : 'ALL';
 
-      // Hitung Iuran Bulan Terpilih & Proyeksi Saldo
+      // Hitung Iuran Bulan Terpilih & Proyeksi Saldo (Magang Bebas Iuran tidak dihitung sebagai penunggak)
       const selectedMonth = document.getElementById('monthFilter').value;
       const activeResidentsList = residents.filter(r => r.status === 'Aktif');
-      const paidCount = activeResidentsList.filter(r => dues.find(d => d.residentId === r.id && d.month === selectedMonth && d.status === 'Lunas')).length;
-      const unpaidCount = Math.max(activeResidentsList.length - paidCount, 0);
+      const billableResidentsList = activeResidentsList.filter(r => parseResidentMeta(r).mustPay);
+      const freeMagangCount = activeResidentsList.length - billableResidentsList.length;
+      const paidCount = billableResidentsList.filter(r => dues.find(d => d.residentId === r.id && d.month === selectedMonth && d.status === 'Lunas')).length;
+      const unpaidCount = Math.max(billableResidentsList.length - paidCount, 0);
       const unpaidTotal = unpaidCount * duesAmount;
       const projectedBalance = Number(summary.balance || 0) + unpaidTotal;
 
@@ -657,7 +703,7 @@
       balEl.className = `text-2xl sm:text-3xl font-extrabold mt-2 ${Number(summary.balance) < 0 ? 'text-rose-600' : 'text-stone-900'}`;
       document.getElementById('valIncome').textContent = fmtRp(summary.totalIncome);
       document.getElementById('valExpense').textContent = fmtRp(summary.totalExpense);
-      document.getElementById('valProjected').innerHTML = `Jika ${unpaidCount} orang yang belum bayar (${fmtMonthIndo(selectedMonth)}) melunasi: <strong class="text-stone-800">${fmtRp(projectedBalance)}</strong>`;
+      document.getElementById('valProjected').innerHTML = `Jika ${unpaidCount} orang wajib iuran yang belum bayar (${fmtMonthIndo(selectedMonth)}) melunasi: <strong class="text-stone-800">${fmtRp(projectedBalance)}</strong>`;
 
       const badgeHealth = document.getElementById('badgeHealth');
       if (summary.balance < 0) {
@@ -672,11 +718,12 @@
       }
 
       // Progress Bar Iuran
-      const pct = activeResidentsList.length > 0 ? Math.round((paidCount / activeResidentsList.length) * 100) : 0;
-      document.getElementById('duesProgressLabel').textContent = `${paidCount} dari ${activeResidentsList.length} Penghuni Aktif Sudah Lunas (${pct}%)`;
+      const pct = billableResidentsList.length > 0 ? Math.round((paidCount / billableResidentsList.length) * 100) : 100;
+      document.getElementById('duesProgressLabel').textContent =
+        `${paidCount} dari ${billableResidentsList.length} Penghuni Wajib Iuran Sudah Lunas (${pct}%)${freeMagangCount > 0 ? ` • ${freeMagangCount} Magang Bebas Iuran` : ''}`;
       document.getElementById('duesUnpaidSummary').textContent = unpaidCount > 0
         ? `${unpaidCount} orang belum bayar (${fmtRp(unpaidTotal)})`
-        : '🎉 Semua penghuni sudah lunas bulan ini!';
+        : '🎉 Semua penghuni wajib iuran sudah lunas!';
       document.getElementById('duesUnpaidSummary').className = unpaidCount > 0 ? 'font-bold text-rose-600' : 'font-bold text-emerald-700';
       document.getElementById('duesProgressBar').style.width = `${pct}%`;
 
@@ -744,25 +791,57 @@
       const colSpan = adminPin ? 6 : 5;
       document.getElementById('ledgerList').innerHTML = trxHtml || `<tr><td colspan="${colSpan}" class="py-10 text-center text-stone-400 text-xs">Belum ada catatan transaksi pada bulan ini.</td></tr>`;
 
-      // Daftar Penghuni (Tanpa kode R01 yang membingungkan orang awam)
+      // Daftar Penghuni (Lengkap dengan status Employee / Magang & pengaturan Wajib Bayar / Bebas Iuran)
       const visibleRes = adminPin ? residents : activeResidentsList;
       const resHtml = visibleRes.map((r, idx) => {
         const isAktif = r.status === 'Aktif';
+        const meta = parseResidentMeta(r);
         const paid = dues.find(d => d.residentId === r.id && d.month === selectedMonth && d.status === 'Lunas');
+
+        const roleBadgeHtml = meta.isMagang
+          ? `<span class="text-[11px] px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 font-bold">🎓 Magang</span>`
+          : `<span class="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">💼 Employee</span>`;
+
+        let statusBadgeHtml = '';
+        if (isAktif) {
+          if (!meta.mustPay) {
+            statusBadgeHtml = `<span class="text-xs px-3 py-1 rounded-full font-bold bg-stone-100 text-stone-600 border border-stone-200">✨ Bebas Iuran</span>`;
+          } else if (paid) {
+            statusBadgeHtml = `<span class="text-xs px-3 py-1 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">✅ Sudah Lunas</span>`;
+          } else {
+            statusBadgeHtml = `<span class="text-xs px-3 py-1 rounded-full font-bold bg-rose-50 text-rose-700 border border-rose-200">⏳ Belum Bayar</span>`;
+          }
+        }
+
+        const subText = !meta.mustPay
+          ? `Anak Magang (Tidak wajib bayar iuran)${meta.cleanNote ? ' • ' + escHtml(meta.cleanNote) : ''}`
+          : (paid && paid.paidAt
+              ? `Dibayar tgl ${fmtShortDate(paid.paidAt)}${meta.cleanNote ? ' • ' + escHtml(meta.cleanNote) : ''}`
+              : `Tagihan: ${fmtRp(duesAmount)}${meta.cleanNote ? ' • ' + escHtml(meta.cleanNote) : ''}`);
+
         return `
           <div class="py-3.5 flex flex-wrap items-center justify-between gap-2 ${!isAktif ? 'opacity-50' : ''}">
             <div class="flex items-center gap-3">
               <span class="w-7 h-7 rounded-full bg-stone-100 border border-stone-200 text-stone-600 text-xs font-bold inline-flex items-center justify-center">${idx + 1}</span>
               <div>
-                <p class="font-bold text-stone-900">${escHtml(r.name)} ${!isAktif ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-stone-200 text-stone-600 ml-1">Sudah Keluar / Non-Aktif</span>' : ''}</p>
-                <p class="text-xs text-stone-400">${r.note ? escHtml(r.note) : (paid && paid.paidAt ? `Dibayar tgl ${fmtShortDate(paid.paidAt)}` : `Tagihan: ${fmtRp(duesAmount)}`)}</p>
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="font-bold text-stone-900">${escHtml(r.name)}</span>
+                  ${roleBadgeHtml}
+                  ${!isAktif ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-stone-200 text-stone-600 font-semibold">Sudah Keluar / Non-Aktif</span>' : ''}
+                </div>
+                <p class="text-xs text-stone-400 mt-0.5">${subText}</p>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-1.5">
-              ${isAktif ? `<span class="text-xs px-3 py-1 rounded-full font-bold ${paid ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}">${paid ? '✅ Sudah Lunas' : '⏳ Belum Bayar'}</span>` : ''}
-              ${(isAktif && !paid && adminPin) ? `<button type="button" onclick="markPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-3 py-1.5 rounded-xl bg-stone-900 text-white font-bold hover:bg-stone-800">Tandai Lunas</button>` : ''}
-              ${(isAktif && paid && adminPin) ? `<button type="button" onclick="unmarkPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-2.5 py-1.5 rounded-xl border border-amber-300 text-amber-800 bg-amber-50 font-semibold hover:bg-amber-100">Batal Lunas</button>` : ''}
+              ${statusBadgeHtml}
+              ${(isAktif && meta.mustPay && !paid && adminPin) ? `<button type="button" onclick="markPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-3 py-1.5 rounded-xl bg-stone-900 text-white font-bold hover:bg-stone-800">Tandai Lunas</button>` : ''}
+              ${(isAktif && meta.mustPay && paid && adminPin) ? `<button type="button" onclick="unmarkPaid('${escHtml(r.id)}', '${escHtml(r.name)}')" class="text-xs px-2.5 py-1.5 rounded-xl border border-amber-300 text-amber-800 bg-amber-50 font-semibold hover:bg-amber-100">Batal Lunas</button>` : ''}
               ${adminPin ? `
+                <select onchange="quickChangeRole('${escHtml(r.id)}', this.value)" class="text-xs px-2 py-1.5 rounded-xl border border-stone-200 bg-stone-50 text-stone-700 font-semibold focus:outline-none" title="Atur Status Employee / Magang & Iuran">
+                  <option value="EMPLOYEE" ${meta.roleType === 'EMPLOYEE' ? 'selected' : ''}>💼 Employee (Bayar)</option>
+                  <option value="MAGANG_FREE" ${meta.roleType === 'MAGANG_FREE' ? 'selected' : ''}>🎓 Magang (Bebas Iuran)</option>
+                  <option value="MAGANG_PAID" ${meta.roleType === 'MAGANG_PAID' ? 'selected' : ''}>🎓 Magang (Wajib Bayar)</option>
+                </select>
                 <button type="button" onclick="toggleResident('${escHtml(r.id)}')" class="text-xs px-2.5 py-1.5 rounded-xl border border-stone-200 text-stone-600 hover:bg-stone-100">${isAktif ? 'Non-Aktifkan' : 'Aktifkan'}</button>
                 <button type="button" onclick="startEditResident('${escHtml(r.id)}')" title="Ubah Nama/Catatan" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-stone-100">✎</button>
                 <button type="button" onclick="deleteResident('${escHtml(r.id)}', '${escHtml(r.name)}')" title="Hapus Penghuni" class="w-8 h-8 inline-flex items-center justify-center rounded-lg border border-stone-200 text-stone-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200">&times;</button>
@@ -909,9 +988,11 @@
     function startEditResident(id) {
       const r = (appData?.residents || []).find(x => x.id === id);
       if (!r) return;
+      const meta = parseResidentMeta(r);
       document.getElementById('editResId').value = r.id;
       document.getElementById('resName').value = r.name;
-      document.getElementById('resNote').value = r.note || '';
+      document.getElementById('resRoleType').value = meta.roleType;
+      document.getElementById('resNote').value = meta.cleanNote || '';
       document.getElementById('btnSubmitRes').textContent = 'Simpan';
       document.getElementById('btnCancelRes').classList.remove('hidden');
       document.getElementById('resName').focus();
@@ -920,8 +1001,32 @@
     function cancelEditResident() {
       document.getElementById('editResId').value = '';
       document.getElementById('residentForm').reset();
-      document.getElementById('btnSubmitRes').textContent = '+ Tambah Orang';
+      document.getElementById('resRoleType').value = 'EMPLOYEE';
+      document.getElementById('btnSubmitRes').textContent = '+ Tambah';
       document.getElementById('btnCancelRes').classList.add('hidden');
+    }
+
+    function quickChangeRole(id, newRoleType) {
+      const r = (appData?.residents || []).find(x => x.id === id);
+      if (!r) return;
+      const meta = parseResidentMeta(r);
+      const encodedNote = encodeResidentNote(newRoleType, meta.cleanNote);
+      saveLocalRole(id, newRoleType);
+      r.note = encodedNote;
+      saveCache(appData);
+      renderDashboard();
+      const label = newRoleType === 'MAGANG_FREE'
+        ? 'Magang (Bebas Iuran)'
+        : (newRoleType === 'MAGANG_PAID' ? 'Magang (Wajib Bayar)' : 'Employee (Wajib Bayar)');
+      showToast(`${r.name} diatur sebagai ${label}`);
+
+      runServer('handleAction', { action: 'updateResident', pin: adminPin, data: { id, name: r.name, note: encodedNote } }, (res) => {
+        if (res && res.ok && res.data) {
+          appData = res.data;
+          saveCache(appData);
+          renderDashboard();
+        }
+      });
     }
 
     function submitResident(e) {
@@ -929,12 +1034,20 @@
       if (isCrudBusy) return;
       const id = document.getElementById('editResId').value;
       const name = document.getElementById('resName').value.trim();
-      const note = document.getElementById('resNote').value.trim();
+      const roleType = document.getElementById('resRoleType').value || 'EMPLOYEE';
+      const cleanNote = document.getElementById('resNote').value.trim();
       if (!name) return;
+      const note = encodeResidentNote(roleType, cleanNote);
       const isEdit = Boolean(id);
+      if (isEdit) saveLocalRole(id, roleType);
       runCrud(isEdit ? 'Memperbarui penghuni...' : 'Menambah penghuni...', { action: isEdit ? 'updateResident' : 'addResident', pin: adminPin, data: { id, name, note } }, (res) => {
         if (res && res.ok) {
           appData = res.data;
+          const added = (appData?.residents || []).find(x => x.name === name);
+          if (added) {
+            saveLocalRole(added.id, roleType);
+            added.note = note;
+          }
           saveCache(appData);
           cancelEditResident();
           renderDashboard();
@@ -1467,7 +1580,7 @@
       const month = document.getElementById('monthFilter').value;
       const amount = appData?.summary?.duesAmount || 80000;
       const unpaid = (appData?.residents || [])
-        .filter(r => r.status === 'Aktif')
+        .filter(r => r.status === 'Aktif' && parseResidentMeta(r).mustPay)
         .filter(r => !(appData?.dues || []).find(d => d.residentId === r.id && d.month === month && d.status === 'Lunas'));
       const payInfo = appData?.summary?.paymentInfo || '-';
       const text = `*REKAP IURAN MES FORTRESS (${fmtMonthIndo(month)})*\nBelum bayar (${unpaid.length} orang):\n` +
